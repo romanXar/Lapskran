@@ -5,6 +5,7 @@
 #include <cstdint>
 #include <string>
 #include <utility>
+#include <unordered_map>
 
 namespace btree {
 	uint32_t id_total = 1;
@@ -18,10 +19,13 @@ namespace btree {
 		std::string name;
 	};
 
+
+
+
 	struct Chunk {
 		Token items[CAP];
 		int live;
-		int offset;    // NEW: логические данные в items[offset..offset+live-1]
+		int offset;
 		Chunk() : live(0), offset(0) {}
 	};
 
@@ -62,8 +66,36 @@ namespace btree {
 		}
 	};
 
+	inline std::unordered_map<std::string, Tree*> trees;
+
 	inline Tree* current = nullptr;
-	inline void use(Tree& t) { current = &t; }
+
+
+
+
+
+	inline void create_tree(std::string name) {
+
+
+		trees[name] = new Tree;
+
+	}
+	inline void use(std::string name) {
+		current = trees[name];
+	}
+
+	inline unsigned int get_length() {
+
+
+		return current->total;
+
+	}
+
+	inline void destroy_tree(std::string name) {
+		delete trees[name];
+		trees[name] = nullptr;
+	}
+
 
 	inline Token& dummy_token() {
 		static Token t;
@@ -458,11 +490,17 @@ namespace btree {
 	}
 
 	inline void set(int i, int j, const Token* src, int& n) {
-	
-		if (n > 0 and get(j).name == "\n" and src[n - 1].name == "\n") {
-			n--;
 
+		
+		
+		if (n > 0 and get(j).name == "\n" and src[n - 1].name == "\n") j++;
+
+		if (n > 0 and i > 0 and get(i - 1).name == "\n" and src[0].name == "\n") {
+			n--;
 		}
+		
+
+
 
 		if (i < 0) i = 0;
 		if (j > current->total) j = current->total;
@@ -727,6 +765,34 @@ namespace btree {
 		nc->items[0] = t;
 		nc->live = 1;
 		append_chunk(nc);
+	}
+
+	inline void move_in(std::string dst_name, int i, int j) {
+		Tree* src = current;
+		if (!src) return;
+
+		Tree* dst = trees[dst_name];
+		if (!dst || dst == src) return;
+
+		std::string src_name;
+		for (auto& [n, t] : trees) {
+			if (t == src) { src_name = n; break; }
+		}
+
+		if (i < 0) i = 0;
+		if (j > dst->total) j = dst->total;
+		if (i > j) i = j;
+
+		int n = src->total;
+		std::vector<Token> buf(n);
+		for (int k = 0; k < n; k++) buf[k] = get(k);
+
+		current = dst;
+		int cnt = n;
+		set(i, j, buf.data(), cnt);
+
+		trees.erase(src_name);
+		delete src;
 	}
 
 	inline uint32_t gen_id() {

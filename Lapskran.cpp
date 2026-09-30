@@ -25,8 +25,11 @@ int main(int argc, char* argv[]) {
 
 	tokens = mengine::init(tokens);
 
-	btree::Tree tree;
-	btree::use(tree);
+
+	btree::create_tree("main");
+	btree::use("main");
+
+
 	for (int i = 0; i < tokens.size();i++) {
 		btree::Token t = { btree::gen_id(),tokens[i] };
 		btree::push_back(t);
@@ -34,36 +37,26 @@ int main(int argc, char* argv[]) {
 
 
 	tokens.clear();	tokens.shrink_to_fit();
-	//for (int i = 0; i < tree.total; i++) {
-	//	btree::Token& tok = btree::get(i);
-	//	std::cout << tok.name;
 
-	//}
-	//cout << endl;
+
 
 	for (int i = 0; i < mengine::lex_pattern.size();i++) {
-		mengine::lex::match(tree, i);
-		//cout << "stage" << endl;
-
-		//for (int i = 0; i < tree.total; i++) {
-		//	btree::Token& tok = btree::get(i);
-		//	std::cout << tok.name;
-
-		//}
+		mengine::lex::match(i);
+	
 
 	}
 
 
 
-	//for (int i = 0; i < tree.total; i++) {
-	//	btree::Token& tok = btree::get(i);
-	//	std::cout << i << ": id=" << tok.id << " name=\"" << tok.name << "\"\n";
-
-	//}
-	//std::cout << "result code petchataet kak on budiet vigliadet" << endl;
-	for (int i = 0; i < tree.total; i++) {
+	
+	for (int i = 0; i < btree::get_length(); i++) {
 		btree::Token& tok = btree::get(i);
 		std::cout << tok.name;
+		if (tok.name != "\n") {
+
+			std::cout << " ";
+
+		}
 
 	}
 

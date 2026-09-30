@@ -52,8 +52,9 @@ vector<string> gen_words_array(string path) {
             continue;
         }
         
-        if (c == '{' || c == '}' || c == '(' || c == ')' ||
-            c == '[' || c == ']' || c == ';' || c == ',') {
+        if (c == '=' || c == '<' || c == '>' || c == '!' ||
+            c == '+' || c == '-' || c == '*' || c == '/' || c == '%' ||
+            c == '&' || c == '|' || c == '^' || c == '~' || c == '?' || c == ':') {
             if (!token.empty()) { tokens.push_back(token); token.clear(); }
             tokens.push_back(string(1, c));
             continue;
@@ -62,10 +63,7 @@ vector<string> gen_words_array(string path) {
         if (c == '=' || c == '<' || c == '>' || c == '!') {
             if (!token.empty()) { tokens.push_back(token); token.clear(); }
             string op(1, c);
-            if (i + 1 < src.size() && src[i + 1] == '=') {
-                op += '=';
-                i++;
-            }
+         
           
             tokens.push_back(op);
             continue;

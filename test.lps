@@ -1,22 +1,22 @@
-0level lex pattern <ff>
-end_macro_obrabotka 
+abc
+
+
+
+
+
+0level lex <token 0>
+
+0a = 1
+1a = 5
+plabel rep
+pif 0a <= 1a else end
+
+	hello world 0a
+
+0a += 1
+
+pgoto rep
+plabel end
+
+
 pend
-
-1level lex pattern <aba>
-ff
-ff 
-pend
-
-6level lex pattern <aaa>
-aaa
-aaa 
-pend
-
-6level lex pattern <aaa>
-aba
-aba 
-pend
-
-
-
-aaa

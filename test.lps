@@ -1,7 +1,21 @@
-abc abc1 hello abc
+abc 
+hello
+
 
 
 0level lex <token 0>
+0a = 0
+1a = 5
 
 
-	<token 0> 0a pend
+plabel rep
+
+pif 0a < 1a else en
+
+	<token 0>
+	0a += 1
+
+pgoto rep
+plabel en
+
+pend

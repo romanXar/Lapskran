@@ -145,6 +145,7 @@
     <ClInclude Include="lex.h" />
     <ClInclude Include="macro_engine.h" />
     <ClInclude Include="orig.h" />
+    <ClInclude Include="properties.h" />
     <ClInclude Include="token.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

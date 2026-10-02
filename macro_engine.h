@@ -1,7 +1,5 @@
 #pragma once
-#include <charconv>
-#include <algorithm>
-#include <map>
+
 
 namespace mengine {
 
@@ -200,9 +198,9 @@ namespace mengine {
 
 		/////////////////
 
-		std::unordered_map<std::string, btree::Token> captured_tokens;
 
 		void match(int i_pattern) {
+			std::unordered_map<std::string, btree::Token> captured_tokens;
 
 			for (int i = 0; i < btree::get_length(); i++) {
 
@@ -394,18 +392,12 @@ namespace mengine {
 
 					std::vector<btree::Token>& body = lex_pattern[i_pattern].body;
 
-					// подстановка 
-
-
-
-					int pushed = 0;
 
 
 					for (int ii = 0; ii < body.size() - 50; ) {
 						//std::cout << body[ii].name << std::endl;
 						if (body[ii].name == "<" and captured_tokens.contains(body[ii + 1].name) and body[ii + 3].name == ">") {
 							btree::push_back(captured_tokens[body[ii + 1].name]);
-							pushed++;
 							ii += 4;
 
 						}
@@ -428,7 +420,6 @@ namespace mengine {
 							else {
 								btree::Token token = { btree::gen_id(),std::to_string(macro_vars[body[ii].name].value) };
 								btree::push_back(token);
-								pushed++;
 								ii++;
 							}
 						}
@@ -504,8 +495,7 @@ namespace mengine {
 						}
 						else {
 							if (body[ii].name != "") {
-								btree::push_back(body[ii]);
-								pushed++;
+								push_back(body[ii]);
 								ii++;
 
 							}
@@ -515,8 +505,7 @@ namespace mengine {
 
 					btree::move_in("main", start_replace, i);
 					btree::use("main");
-
-					i = start_replace + pushed - 1;
+					i += btree::get_resize() - 1;
 				}
 				else {
 					i = start_replace;
@@ -543,5 +532,5 @@ namespace mengine {
 
 		}
 	}
-
+	
 }

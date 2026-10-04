@@ -11,7 +11,6 @@ namespace btree {
 	struct Token {
 		uint32_t id;
 		std::string name;
-		//int name;
 	};
 	
 	struct Chunk {

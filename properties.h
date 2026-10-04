@@ -5,7 +5,7 @@ namespace props {
 	std::unordered_map<std::string,std::unordered_map<int,std::map<std::string, std::string>>> db;
 
     void set(const std::string& name, int id, const std::string& key, const std::string& val) {
-        if (val.empty()) {
+        if (val == "\"\"") {
             auto it_name = db.find(name);
             if (it_name == db.end()) return;
 

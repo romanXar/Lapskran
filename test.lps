@@ -1,21 +1,8 @@
-abc 
-hello
+abc
 
-
-
-0level lex <token 0>
-0a = 0
-1a = 5
-
-
-plabel rep
-
-pif 0a < 1a else en
-
-	<token 0>
-	0a += 1
-
-pgoto rep
-plabel en
-
+0level lex <word 0>
+<0>
+<0>.hello=hi
+<0>.hello=""
+<0>.hello
 pend

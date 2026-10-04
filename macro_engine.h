@@ -228,7 +228,7 @@ namespace mengine {
 		/////////////////
 
 
-		void goto_label(const std::vector<btree::Token>& body,int &ii) {
+		void goto_label(const std::vector<btree::Token>& body, int& ii) {
 			std::string jump_label = body[ii].name;
 
 			for (ii = 0; ii < body.size() - 50; ii++) {
@@ -363,7 +363,7 @@ namespace mengine {
 
 						if (token_name == "\\n") token_name = "\n";
 
-						if (token_name == input_token or token_name == "token") {
+						if (token_name == input_token or token_name == "token" or (token_name == "word" and input_token != "\n")) {
 							level.back().result_match = true;
 							i++;
 						}
@@ -420,7 +420,8 @@ namespace mengine {
 				//
 
 				struct Macro_var {
-					int value = 0;
+					std::string value = "";
+
 				};
 
 				std::unordered_map<std::string, Macro_var> macro_vars;
@@ -435,11 +436,76 @@ namespace mengine {
 
 
 					for (int ii = 0; ii < body.size() - 50; ) {
-						//std::cout << body[ii].name << std::endl;
-						if (is_concurrence(body,ii, 4, "<", "any", "any", ">")) {
-							btree::push_back(captured_tokens[body[ii + 2].name]);
+
+
+						/**************/
+						//<123>.asd = afefef
+						if (is_concurrence(body, ii, 7, "<", "any", ">", ".", "any", "=", "any")) {
+							auto it = captured_tokens.find(body[ii + 1].name);
+							if (it != captured_tokens.end()) {
+								props::set(it->second.name, it->second.id, body[ii + 4].name, body[ii + 6].name);
+							}
 							ii += resize_ii;
 						}
+						/**************/
+						//<123>.asd
+						else if (is_concurrence(body, ii, 5, "<", "any", ">", ".", "any")) {
+							auto it = captured_tokens.find(body[ii + 1].name);
+							if (it != captured_tokens.end()) {
+
+								std::string val = props::get(it->second.name, it->second.id, body[ii + 4].name);
+								if (val.empty()) {
+									std::cout << "macro bastard: property '" << body[ii + 4].name	<< "' not found on token <" << body[ii + 1].name << ">" << std::endl;
+									exit(-1);
+								}
+								btree::push_back({ btree::gen_id(), val });
+
+							}
+							ii += resize_ii;
+						}
+						/**************/
+						//<123>
+						else if (is_concurrence(body, ii, 3, "<", "any", ">") and captured_tokens.contains(body[ii + 1].name)) {
+							btree::push_back(captured_tokens[body[ii + 1].name]);
+							ii += resize_ii;
+						}
+						/*********/
+						// pint 0a = 10
+						// pint 0a = 0b
+						// pint 0a = <abc 123>.ggggg
+						else if (body[ii].name == "pint") {
+
+							if (is_macro_var(body[ii + 1].name) and is_concurrence(body, ii, 9, "pint", "any", "=", "<", "any", "any", ">", ".", "any")) {
+
+								//std::cout << "true";
+								ii += resize_ii;
+
+							}
+							else if (is_macro_var(body[ii + 1].name) and is_concurrence(body, ii, 4, "pint", "any", "=", "any")) {
+								if (is_integer(body[ii + 3].name)) {
+									macro_vars[body[ii + 1].name].value = body[ii + 3].name;
+								}
+								else if (macro_vars.contains(body[ii + 3].name)) {
+									if (is_integer(macro_vars[body[ii + 3].name].value)) {
+										macro_vars[body[ii + 1].name].value = macro_vars[body[ii + 3].name].value;
+									}
+									else {
+										std::cout << "error 1" << std::endl;
+										exit(-1);
+									}
+								}
+								else {
+									std::cout << "error 2" << std::endl;
+									exit(-1);
+								}
+
+								ii += resize_ii;
+
+							}
+
+						}
+
+
 						else if (is_macro_var(body[ii].name)) {
 							if (is_concurrence(body, ii, 3, "any", "=", "any")) {
 								macro_vars[body[ii].name].value = std::stoi(body[ii + 2].name);
@@ -451,11 +517,13 @@ namespace mengine {
 
 							}
 							else if (is_concurrence(body, ii, 4, "any", "-", "=", "any")) {
-								macro_vars[body[ii].name].value -= std::stoi(body[ii + 3].name);
+								//macro_vars[body[ii].name].value -= std::stoi(body[ii + 3].name);
 								ii += resize_ii;
 							}
 							else {
-								btree::Token token = { btree::gen_id(),std::to_string(macro_vars[body[ii].name].value) };
+								//std::cout << "true";
+
+								btree::Token token = { btree::gen_id(),macro_vars[body[ii].name].value };
 								btree::push_back(token);
 								ii++;
 							}
@@ -468,7 +536,7 @@ namespace mengine {
 									ii += resize_ii;
 								}
 								else {
-									goto_label(body,ii+=6);
+									goto_label(body, ii += 6);
 								}
 							}
 							else if (is_concurrence(body, ii, 7, "pif", "any", "!", "=", "any", "else", "any")) {
@@ -514,11 +582,15 @@ namespace mengine {
 								}
 							}
 						}
+						else if (is_concurrence(body, ii, 6, "pif", "any", "<", "any", "else", "any")) {
+
+							/////////
+						}
 						else if (body[ii].name == "plabel") {
 							ii += 2;
 						}
 						else if (body[ii].name == "pgoto") {
-							goto_label(body, ii+=1);
+							goto_label(body, ii += 1);
 						}
 						else {
 							if (body[ii].name != "") {

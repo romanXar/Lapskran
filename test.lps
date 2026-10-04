@@ -1,8 +1,21 @@
-abc
+clone(hello,5)
 
-0level lex <word 0>
-<0>
-<0>.hello=hi
-<0>.hello=""
-<0>.hello
+0level lex <clone><(><word 0><,><word 1><)>
+
+pint 0d = <1>
+pint 0a = 0
+
+plabel rep
+pif 0a < 0d else rep_end
+
+	<0>
+	0a +=1
+
+
+pgoto rep
+plabel rep_end
+
+
+
+
 pend

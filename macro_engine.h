@@ -421,6 +421,7 @@ namespace mengine {
 
 				struct Macro_var {
 					std::string value = "";
+					std::string type = "";
 
 				};
 
@@ -437,7 +438,7 @@ namespace mengine {
 
 					for (int ii = 0; ii < body.size() - 50; ) {
 
-
+						//------------------
 						/**************/
 						//<123>.asd = afefef
 						if (is_concurrence(body, ii, 7, "<", "any", ">", ".", "any", "=", "any")) {
@@ -455,7 +456,7 @@ namespace mengine {
 
 								std::string val = props::get(it->second.name, it->second.id, body[ii + 4].name);
 								if (val.empty()) {
-									std::cout << "macro bastard: property '" << body[ii + 4].name	<< "' not found on token <" << body[ii + 1].name << ">" << std::endl;
+									std::cout << "macro bastard: property '" << body[ii + 4].name << "' not found on token <" << body[ii + 1].name << ">" << std::endl;
 									exit(-1);
 								}
 								btree::push_back({ btree::gen_id(), val });
@@ -469,55 +470,188 @@ namespace mengine {
 							btree::push_back(captured_tokens[body[ii + 1].name]);
 							ii += resize_ii;
 						}
+						//------------------
+
+
+						//------------------
+
 						/*********/
 						// pint 0a = 10
 						// pint 0a = 0b
-						// pint 0a = <abc 123>.ggggg
+						// pint 0a = <123>.ggggg
 						else if (body[ii].name == "pint") {
-
-							if (is_macro_var(body[ii + 1].name) and is_concurrence(body, ii, 9, "pint", "any", "=", "<", "any", "any", ">", ".", "any")) {
-
-								//std::cout << "true";
-								ii += resize_ii;
-
+							if (!is_macro_var(body[ii + 1].name)) {
+								std::cout << "macro bastard: 'pint' expects var name, got '"
+									<< body[ii + 1].name << "'" << std::endl;
+								exit(-1);
 							}
-							else if (is_macro_var(body[ii + 1].name) and is_concurrence(body, ii, 4, "pint", "any", "=", "any")) {
-								if (is_integer(body[ii + 3].name)) {
-									macro_vars[body[ii + 1].name].value = body[ii + 3].name;
-								}
-								else if (macro_vars.contains(body[ii + 3].name)) {
-									if (is_integer(macro_vars[body[ii + 3].name].value)) {
-										macro_vars[body[ii + 1].name].value = macro_vars[body[ii + 3].name].value;
-									}
-									else {
-										std::cout << "error 1" << std::endl;
-										exit(-1);
-									}
-								}
-								else {
-									std::cout << "error 2" << std::endl;
+
+							if (macro_vars.contains(body[ii + 1].name)
+								and macro_vars[body[ii + 1].name].type != ""
+								and macro_vars[body[ii + 1].name].type != "pint") {
+								std::cout << "macro bastard: var '" << body[ii + 1].name
+									<< "' already declared as '"
+									<< macro_vars[body[ii + 1].name].type << "'" << std::endl;
+								exit(-1);
+							}
+
+							macro_vars[body[ii + 1].name].type = "pint";
+							ii += 1;
+						}
+						//------------------
+
+
+
+						//------------------
+
+						//0a = 0b
+						//0a = 40
+						//0a = <132>
+						//0a = <132>.aadff
+					
+						else if (is_macro_var(body[ii].name)) {
+							if (is_concurrence(body, ii, 7, "any", "=", "<", "any", ">", ".", "any")) {
+
+								// 1. Макропеременная должна существовать
+								if (!macro_vars.contains(body[ii].name)) {
+									std::cout << "macro bastard: macro var '" << body[ii].name << "' not found" << std::endl;
 									exit(-1);
 								}
 
+								// 2. И быть pint
+								if (macro_vars[body[ii].name].type != "pint") {
+									std::cout << "macro bastard: macro var '" << body[ii].name	<< "' is not pint" << std::endl;
+									exit(-1);
+								}
+
+								// 3. Захват должен существовать
+								auto it = captured_tokens.find(body[ii + 3].name);
+								if (it == captured_tokens.end()) {
+									std::cout << "macro bastard: capture '" << body[ii + 3].name << "' not found" << std::endl;
+									exit(-1);
+								}
+
+								// 4. Свойство должно существовать
+								std::string val = props::get(it->second.name, it->second.id, body[ii + 6].name);
+								if (val.empty()) {
+									std::cout << "macro bastard: property '" << body[ii + 6].name << "' not found on token <" << body[ii + 3].name << ">"<< std::endl;
+									exit(-1);
+								}
+
+								// 5. И быть числом
+								if (!is_integer(val)) {
+									std::cout << "macro bastard: property '" << body[ii + 6].name << "' on token <" << body[ii + 3].name << "> is not integer (value='" << val << "')"	<< std::endl;
+									exit(-1);
+								}
+
+								// Всё ок — присвоить
+								macro_vars[body[ii].name].value = val;
 								ii += resize_ii;
+							}
+							else if (is_concurrence(body, ii, 5, "any", "=", "<", "any", ">")) {
+
+								// 1. Макропеременная должна существовать
+								if (!macro_vars.contains(body[ii].name)) {
+									std::cout << "macro bastard: macro var '" << body[ii].name
+										<< "' not found" << std::endl;
+									exit(-1);
+								}
+
+								// 2. И быть pint
+								if (macro_vars[body[ii].name].type != "pint") {
+									std::cout << "macro bastard: macro var '" << body[ii].name
+										<< "' is not pint (type='" << macro_vars[body[ii].name].type
+										<< "')" << std::endl;
+									exit(-1);
+								}
+
+								// 3. Захват должен существовать
+								auto it = captured_tokens.find(body[ii + 3].name);
+								if (it == captured_tokens.end()) {
+									std::cout << "macro bastard: capture '" << body[ii + 3].name
+										<< "' not found" << std::endl;
+									exit(-1);
+								}
+
+								// 4. Имя токена должно быть числом
+								if (!is_integer(it->second.name)) {
+									std::cout << "macro bastard: token name '" << it->second.name
+										<< "' (captured as <" << body[ii + 3].name
+										<< ">) is not integer" << std::endl;
+									exit(-1);
+								}
+
+								// Всё ок — записать имя токена в макропеременную
+								macro_vars[body[ii].name].value = it->second.name;
+								ii += resize_ii;
+							}
+							else if (is_concurrence(body, ii, 3, "any", "=", "any")) {
+								if (!macro_vars.contains(body[ii].name)) {
+									std::cout << "macro bastard: macro var '" << body[ii].name << "' not found" << std::endl;
+									exit(-1);
+
+								}
+								if (macro_vars[body[ii].name].type == "pint") {
+
+
+									if (is_macro_var(body[ii + 2].name)) {
+										if (!macro_vars.contains(body[ii + 2].name)) {
+											std::cout << "macro bastard: macro var '" << body[ii + 2].name << "' not found" << std::endl;
+											exit(-1);
+
+										}
+										else {
+
+											macro_vars[body[ii].name].value = macro_vars[body[ii + 2].name].value;
+											ii += resize_ii;
+										}
+									}
+									else if (is_integer(body[ii + 2].name)) {
+
+										macro_vars[body[ii].name].value = body[ii + 2].name;
+										ii += resize_ii;
+
+
+									}
+									else {
+										std::cout << "macro bastard: macro var or token '" << body[ii + 2].name << "' not int" << std::endl;
+										exit(-1);
+
+
+									}
+
+
+
+
+
+
+								}
+
+
+
+
+
+
+
 
 							}
 
-						}
 
 
-						else if (is_macro_var(body[ii].name)) {
-							if (is_concurrence(body, ii, 3, "any", "=", "any")) {
-								macro_vars[body[ii].name].value = std::stoi(body[ii + 2].name);
-								ii += resize_ii;
-							}
+
+
+
+
+
+
+
 							else if (is_concurrence(body, ii, 4, "any", "+", "=", "any")) {
-								macro_vars[body[ii].name].value += std::stoi(body[ii + 3].name);
+								macro_vars[body[ii].name].value = std::to_string(std::stoi(macro_vars[body[ii].name].value) + std::stoi(body[ii + 3].name));
 								ii += resize_ii;
 
 							}
 							else if (is_concurrence(body, ii, 4, "any", "-", "=", "any")) {
-								//macro_vars[body[ii].name].value -= std::stoi(body[ii + 3].name);
+								macro_vars[body[ii].name].value = std::to_string(std::stoi(macro_vars[body[ii].name].value) - std::stoi(body[ii + 3].name));
 								ii += resize_ii;
 							}
 							else {

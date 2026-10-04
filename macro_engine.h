@@ -383,10 +383,18 @@ namespace mengine {
 					for (int ii = 0; ii < body.size() - 50; ) {
 
 						//<123>.asd = afefef
+						//<123>.asd = 0a
 						if (is_concurrence(body, ii, 7, LT, ANY, GT, DOT, ANY, EQ, ANY)) {
 							auto it = captured_tokens.find(body[ii + 1].name);
+
 							if (it != captured_tokens.end()) {
-								props::set(it->second.name, it->second.id, body[ii + 4].name, body[ii + 6].name);
+								if (macro_vars.contains(body[ii + 6].name)) {
+									props::set(it->second.name, it->second.id, body[ii + 4].name, intern(std::to_string(macro_vars[body[ii + 6].name].value)));
+								}
+								else {
+									props::set(it->second.name, it->second.id, body[ii + 4].name, body[ii + 6].name);
+								}
+
 							}
 							ii += resize_ii;
 						}

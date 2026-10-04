@@ -1,52 +1,23 @@
-clone(hello,2)
+abc
+hi
+dd
+aa
+gn
+aa
+aa
+aa
 
-
-
-
-
-
-
-2level lex <clone><(><word 0><,><word 1><)>
-
-pint 0d = <1>
-pint 0a = 0
-
-plabel rep
-pif 0a < 0d else rep_end
-
-	
-	<0>
-	0a +=1
-
-
-pgoto rep
-plabel rep_end
-
-
-
-
+1level lex <word 0>
+pint 0a = 11
+<0>.size = 0a
+<0>
 pend
 
-
-1level lex<hello>
-
-pint 0d = 5
-pint 0a = 0
-
-plabel rep
-pif 0a < 0d else rep_end
-
-	
-	hello
-	0a +=1
-
-
-pgoto rep
-plabel rep_end
-
-
-
-
+1level lex <word 0>
+pint 0a = <0>.size
+pif 0a == 12 else endd
+true
+plabel endd
 pend
 
 
@@ -55,26 +26,3 @@ pend
 
 
 
-
-
-
-
-0level lex<hello>
-pint 0d = 10
-pint 0a = 0
-
-plabel rep
-pif 0a < 0d else rep_end
-
-	
-	hello
-	0a +=1
-
-
-pgoto rep
-plabel rep_end
-
-
-
-
-pend

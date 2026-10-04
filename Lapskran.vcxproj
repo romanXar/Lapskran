@@ -142,6 +142,7 @@
     <ClCompile Include="Lapskran.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="Interning.h" />
     <ClInclude Include="lex.h" />
     <ClInclude Include="macro_engine.h" />
     <ClInclude Include="orig.h" />

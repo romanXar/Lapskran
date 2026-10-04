@@ -1,6 +1,12 @@
-clone(hello,5)
+clone(hello,2)
 
-0level lex <clone><(><word 0><,><word 1><)>
+
+
+
+
+
+
+2level lex <clone><(><word 0><,><word 1><)>
 
 pint 0d = <1>
 pint 0a = 0
@@ -8,7 +14,60 @@ pint 0a = 0
 plabel rep
 pif 0a < 0d else rep_end
 
+	
 	<0>
+	0a +=1
+
+
+pgoto rep
+plabel rep_end
+
+
+
+
+pend
+
+
+1level lex<hello>
+
+pint 0d = 5
+pint 0a = 0
+
+plabel rep
+pif 0a < 0d else rep_end
+
+	
+	hello
+	0a +=1
+
+
+pgoto rep
+plabel rep_end
+
+
+
+
+pend
+
+
+
+
+
+
+
+
+
+
+
+0level lex<hello>
+pint 0d = 10
+pint 0a = 0
+
+plabel rep
+pif 0a < 0d else rep_end
+
+	
+	hello
 	0a +=1
 
 

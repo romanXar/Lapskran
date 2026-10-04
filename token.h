@@ -1,18 +1,19 @@
 #pragma once
 
 namespace btree {
+	inline void erase_chunk(int elem_pos);
 
 	uint32_t id_total = 1;
 	const int CAP = 512;
 	const int B = 32;
 	const int MAX_DEPTH = 64;
 	const int MAX_NEW_CHUNKS = 64;
-	
+
 	struct Token {
 		uint32_t id;
-		std::string name;
+		uint32_t name;
 	};
-	
+
 	struct Chunk {
 		Token items[CAP];
 		int live, offset;
@@ -22,34 +23,35 @@ namespace btree {
 			offset = 0;
 		}
 	};
+	inline void insert_chunk(int elem_pos, Chunk* nc);
 
 	struct Node {
 		bool  leaf;
-		int   num,count;
+		int   num, count;
 
 		Node** children;
 		Chunk** chunks;
 
-		Node(bool is_leaf = false) 
+		Node(bool is_leaf = false)
 		{
 			leaf = is_leaf;
 			num = count = 0;
-			
+
 			children = nullptr;
 			chunks = nullptr;
 
-			if (leaf) chunks = new Chunk *[B + 2];
-			else children = new Node *[B + 2];
+			if (leaf) chunks = new Chunk * [B + 2];
+			else children = new Node * [B + 2];
 		}
 
-		~Node() 
+		~Node()
 		{
-			if (leaf) 
+			if (leaf)
 			{
 				for (int i = 0; i < num; ++i) delete chunks[i];
 				delete[] chunks;
 			}
-			else 
+			else
 			{
 				for (int i = 0; i < num; ++i) delete children[i];
 				delete[] children;
@@ -60,14 +62,14 @@ namespace btree {
 	};
 
 	struct Tree {
-		Node *root, *cache_leaf;
-		int   current_total,old_total,cache_prefix;
-		
+		Node* root, * cache_leaf;
+		int   current_total, old_total, cache_prefix;
+
 		Tree() {
 
 			root = cache_leaf = nullptr;
 			current_total = old_total = cache_prefix = 0;
-			
+
 		};
 
 		~Tree() {
@@ -200,70 +202,20 @@ namespace btree {
 
 	inline void replace_chunk_in_leaf(DescentPath& dp, int k,
 		Chunk** ncs, int num_chunks) {
-		Node* leaf = dp.leaf;
 
-		int delta = 0;
-		for (int i = 0; i < num_chunks; i++) delta += ncs[i]->live;
-		delta -= leaf->chunks[k]->live;
+		int acc = 0;
+		for (int i = 0; i < k; i++) acc += dp.leaf->chunks[i]->live;
+		int cur_pos = dp.prefix + acc;
 
-		delete leaf->chunks[k];
-		for (int i = k; i < leaf->num - 1; i++)
-			leaf->chunks[i] = leaf->chunks[i + 1];
-		leaf->num--;
+		erase_chunk(cur_pos);
 
-		for (int i = leaf->num - 1; i >= k; i--)
-			leaf->chunks[i + num_chunks] = leaf->chunks[i];
-
-		for (int ci = 0; ci < num_chunks; ci++)
-			leaf->chunks[k + ci] = ncs[ci];
-		leaf->num += num_chunks;
-
-		leaf->count += delta;
-		for (int i = 0; i < dp.depth; i++)
-			dp.nodes[i]->count += delta;
-
-		Node* node = leaf;
-		int d = dp.depth - 1;
-		while (node->num > B) {
-			Node* right = new Node(node->leaf);
-			int mid = node->num / 2;
-			if (node->leaf) {
-				for (int i = mid; i < node->num; i++)
-					right->chunks[i - mid] = node->chunks[i];
-				right->num = node->num - mid;
-				node->num = mid;
-			}
-			else {
-				for (int i = mid; i < node->num; i++)
-					right->children[i - mid] = node->children[i];
-				right->num = node->num - mid;
-				node->num = mid;
-			}
-			recalc(node);
-			recalc(right);
-
-			if (d < 0) {
-				Node* new_root = new Node(false);
-				new_root->children[0] = node;
-				new_root->children[1] = right;
-				new_root->num = 2;
-				recalc(new_root);
-				current->root = new_root;
-				return;
-			}
-
-			Node* parent = dp.nodes[d];
-			int idx = 0;
-			while (parent->children[idx] != node) idx++;
-
-			for (int i = parent->num; i > idx + 1; i--)
-				parent->children[i] = parent->children[i - 1];
-			parent->children[idx + 1] = right;
-			parent->num++;
-
-			node = parent;
-			d--;
+		int ins_pos = cur_pos;
+		for (int ci = 0; ci < num_chunks; ci++) {
+			insert_chunk(ins_pos, ncs[ci]);
+			ins_pos += ncs[ci]->live;
 		}
+
+		current->cache_leaf = nullptr;
 	}
 
 	Node* insert_rec(Node* n, int elem_pos, Chunk* nc) {
@@ -500,14 +452,14 @@ namespace btree {
 		if (i < 0) i = 0;
 		if (j > current->current_total) j = current->current_total;
 		if (i > j) i = j;
-		
-		if (n > 0 and j < current->current_total and get(j).name == "\n" and src[n - 1].name == "\n") {
+
+		if (n > 0 and j < current->current_total and get(j).name == NEWLINE and src[n - 1].name == NEWLINE) {
 			current->old_total--;
 			j++;
 		}
-		if (n > 0 and j == current->current_total and src[n - 1].name == "\n") n--;
-		if (n > 0 and i > 0 and get(i - 1).name == "\n" and src[0].name == "\n") i--;
-		
+		if (n > 0 and j == current->current_total and src[n - 1].name == NEWLINE) n--;
+		if (n > 0 and i > 0 and get(i - 1).name == NEWLINE and src[0].name == NEWLINE) i--;
+
 		// ---------- in-place ----------
 		if (n > 0 && n == j - i) {
 			int w = 0;
@@ -715,7 +667,6 @@ namespace btree {
 				pos2 += take;
 			}
 
-			current->current_total += n;
 			replace_chunk_in_leaf(dp, k, ncs, num_chunks);
 			current->cache_leaf = nullptr;
 		}
@@ -745,15 +696,13 @@ namespace btree {
 
 		Chunk* last = cur->chunks[cur->num - 1];
 
-		// Симметрично move_in: если вставляем '\n' в самый конец
-		// и последний символ уже '\n' — это no-op.
-		if (t.name == "\n"
+		if (t.name == NEWLINE
 			&& last->live > 0
-			&& last->items[last->offset + last->live - 1].name == "\n")
+			&& last->items[last->offset + last->live - 1].name == NEWLINE)
 		{
 			return;
 		}
-		
+
 		if (last->offset + last->live < CAP) {
 			last->items[last->offset + last->live] = t;
 			last->live++;
@@ -781,36 +730,30 @@ namespace btree {
 		for (auto& [n, t] : trees) {
 			if (t == src_tree) { src_name = n; break; }
 		}
-		
-		int skip = (i == 0 && src_tree->current_total > 0 && get(0).name == "\n") ? 1 : 0;
+
+		int skip = (i == 0 && src_tree->current_total > 0 && get(0).name == NEWLINE) ? 1 : 0;
 		int n = src_tree->current_total - skip;
 		std::vector<Token> buf(n);
 		for (int k = 0; k < n; k++) buf[k] = get(k + skip);
-		
-		//////////////////////////
-		//int n = src_tree->current_total;
 
-		//std::vector<Token> buf(n);
-		//for (int k = 0; k < n; k++) buf[k] = get(k);
-		/////////////////////////////////////
 		current = dst;
 		current->old_total = current->current_total;
 
 		if (i < 0) i = 0;
 		if (j > current->current_total) j = current->current_total;
 		if (i > j) i = j;
-		
-		if (n > 0 and j < current->current_total and get(j).name == "\n" and buf[n - 1].name == "\n") {
+
+		if (n > 0 and j < current->current_total and get(j).name == NEWLINE and buf[n - 1].name == NEWLINE) {
 			current->old_total--;
 			j++;
 		}
 
-		if (n > 0 and j == current->current_total and buf[n - 1].name == "\n") n--;
+		if (n > 0 and j == current->current_total and buf[n - 1].name == NEWLINE) n--;
 
-		if (n > 0 and i > 0 and get(i - 1).name == "\n" and buf[0].name == "\n") {
+		if (n > 0 and i > 0 and get(i - 1).name == NEWLINE and buf[0].name == NEWLINE) {
 			i--;
 		}
-		
+
 		if (n > 0 && n == j - i) {
 			int w = 0;
 			int pos = i;
@@ -1015,7 +958,6 @@ namespace btree {
 				pos2 += take;
 			}
 
-			current->current_total += n;
 			replace_chunk_in_leaf(dp, k, ncs, num_chunks);
 			current->cache_leaf = nullptr;
 		}

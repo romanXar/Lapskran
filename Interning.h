@@ -55,7 +55,7 @@ const std::string& get_str(uint32_t id) {
 uint32_t get_id(const std::string& s) {
 	if (s == "\n") return NEWLINE;
 	if (str_to_id.contains(s)) return str_to_id[s];
-	return ANY;
+	return NOT_FOUND;
 }
 
 inline bool is_int_sid(uint32_t id) {

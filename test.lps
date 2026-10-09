@@ -1,26 +1,41 @@
-abc
-hi
-dd
-aa
-gn
-aa
-aa
-aa
+clone(abc,6,default)
+clone(456,5,newln)
 
-1level lex <word 0>
-pint 0a = 11
-<0>.size = 0a
+
+
+0level lex <clone><(><word 0><,><word 1><,><word 2><)>
+pint 0a = 0
+pint 0b = <1>
+
+pstring 0j = <2>
+
+pwhile 0a < 0b
+
+
 <0>
+
+pif 0j == newln 
+
+pnewline
+
 pend
 
-1level lex <word 0>
-pint 0a = <0>.size
-pif 0a == 12 else endd
-true
-plabel endd
+0a += 1
+pend
+
 pend
 
 
+0level lex <456>
+55555
+pend
+
+
+
+0level lex <abc> or <55555>
+ff
+
+pend
 
 
 

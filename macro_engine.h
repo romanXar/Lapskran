@@ -5,14 +5,12 @@ namespace mengine {
 	enum CmdType {
 		CMD_TOKWN = 1,
 		CMD_TOK,
-		CMD_REP,
 		CMD_END_COND,
 		CMD_AND,
 		CMD_OR
 	};
 
 	struct Condition {
-		int vector_level = 0;
 		uint32_t command_type = 0;
 		std::vector<uint32_t> comand;
 	};
@@ -47,11 +45,17 @@ namespace mengine {
 		std::vector<uint32_t> output_token;
 
 		int nested = -1;
-		int cond_level = 0;
-		int old_cond_level = 0;
+
 
 		bool is_cond = false;
 		bool is_body = false;
+
+		struct BodyFrame {
+			int      type = 0;
+			uint32_t lbl1 = 0;
+			uint32_t lbl2 = 0;
+		};
+		std::vector<BodyFrame> body_stack;
 
 		tk.push_back(0);
 		tk.push_back(0);
@@ -64,77 +68,126 @@ namespace mengine {
 				p.level = (int)get_num(tk[i]);
 				p.stage = tk[i + 2];
 				pattern->push_back(p);
-				cond_level = 0;
-				old_cond_level = 0;
 
 				nested++;
+				body_stack.clear();
 			}
+
 			else if (tk[i] == PEND) { nested--; }
 
 			if (nested >= 0) {
 
 				if (is_cond) {
-					if (tk[i] == LT) {
-						cond_level++;
-					}
-					else if (tk[i] == GT) {
-						cond_level--;
-					}
-					else if (tk[i] == LBRACK) {
-						pattern->back().condition.push_back({});
-						pattern->back().condition.back().command_type = CMD_REP;
-						cond_level++;
-					}
-					else if (tk[i] == RBRACK) {
-						cond_level--;
-					}
-					else {
-						if ((tk[i] != LT and tk[i] != LBRACK) and (tk[i - 1] == LT or tk[i - 1] == LBRACK) and tk[i] != OR) {
-							if (tk[i + 1] == GT) {
-								pattern->back().condition.push_back({});
-								pattern->back().condition.back().vector_level = cond_level - old_cond_level - 1;
-								pattern->back().condition.back().command_type = CMD_TOKWN;
-								pattern->back().condition.back().comand.push_back(tk[i]);
-								old_cond_level = cond_level;
-							}
-							else if (tk[i + 2] == GT) {
-								pattern->back().condition.push_back({});
-								pattern->back().condition.back().vector_level = cond_level - old_cond_level - 1;
-								pattern->back().condition.back().command_type = CMD_TOK;
-								pattern->back().condition.back().comand.push_back(tk[i]);
-								pattern->back().condition.back().comand.push_back(tk[i + 1]);
-								old_cond_level = cond_level;
-								i++;
-							}
-						}
-						else if (tk[i] == OR) {
+
+
+					if ((tk[i] != LT) and (tk[i - 1] == LT) and tk[i] != OR) {
+						if (tk[i + 1] == GT) {
 							pattern->back().condition.push_back({});
-							pattern->back().condition.back().vector_level = cond_level - old_cond_level + 1;
-							pattern->back().condition.back().command_type = CMD_OR;
-							old_cond_level = cond_level;
+							pattern->back().condition.back().command_type = CMD_TOKWN;
+							pattern->back().condition.back().comand.push_back(tk[i]);
 						}
+						else if (tk[i + 2] == GT) {
+							pattern->back().condition.push_back({});
+							pattern->back().condition.back().command_type = CMD_TOK;
+							pattern->back().condition.back().comand.push_back(tk[i]);
+							pattern->back().condition.back().comand.push_back(tk[i + 1]);
+							i++;
+						}
+					}
+					else if (tk[i] == OR) {
+						pattern->back().condition.push_back({});
+						pattern->back().condition.back().command_type = CMD_OR;
 					}
 
-					if ((tk[i] == GT or tk[i] == RBRACK) and (tk[i + 1] == LT or tk[i + 1] == LBRACK)) {
+
+					if ((tk[i] == GT) and (tk[i + 1] == LT)) {
 						pattern->back().condition.push_back({});
-						pattern->back().condition.back().vector_level = cond_level - old_cond_level + 1;
 						pattern->back().condition.back().command_type = CMD_AND;
-						old_cond_level = cond_level;
 					}
 				}
 				else if (is_body) {
-					pattern->back().body.push_back({ 0, tk[i] });
+
+					if (tk[i] == PIF) {
+						nested++;
+						BodyFrame f;
+						f.type = 1;
+						f.lbl1 = next_id++;
+						body_stack.push_back(f);
+
+						int cond_len = 3;
+						if (tk[i + 3] == EQ) {
+							cond_len = 4;
+						}
+
+						pattern->back().body.push_back({ 0, PIF });
+						for (int k = 1; k <= cond_len; k++) {
+							pattern->back().body.push_back({ 0, tk[i + k] });
+						}
+						pattern->back().body.push_back({ 0, ELSE });
+						pattern->back().body.push_back({ 0, f.lbl1 });
+
+						i += cond_len;
+					}
+					else if (tk[i] == PWHILE) {
+						nested++;
+						BodyFrame f;
+						f.type = 2;
+						f.lbl1 = next_id++;
+						f.lbl2 = next_id++;
+						body_stack.push_back(f);
+
+						int cond_len = 3;
+						if (tk[i + 3] == EQ) {
+							cond_len = 4;
+						}
+
+						pattern->back().body.push_back({ 0, PLABEL });
+						pattern->back().body.push_back({ 0, f.lbl1 });
+						pattern->back().body.push_back({ 0, PIF });
+						for (int k = 1; k <= cond_len; k++) {
+							pattern->back().body.push_back({ 0, tk[i + k] });
+						}
+						pattern->back().body.push_back({ 0, ELSE });
+						pattern->back().body.push_back({ 0, f.lbl2 });
+
+						i += cond_len;
+					}
+					else if (tk[i] == PEND and body_stack.size() > 1) {
+						BodyFrame f = body_stack.back();
+						body_stack.pop_back();
+
+						if (f.type == 1) {
+							pattern->back().body.push_back({ 0, PLABEL });
+							pattern->back().body.push_back({ 0, f.lbl1 });
+						}
+						else if (f.type == 2) {
+							pattern->back().body.push_back({ 0, PGOTO });
+							pattern->back().body.push_back({ 0, f.lbl1 });
+							pattern->back().body.push_back({ 0, PLABEL });
+							pattern->back().body.push_back({ 0, f.lbl2 });
+						}
+					}
+					else if (tk[i] != NEWLINE) {
+						pattern->back().body.push_back({ 0, tk[i] });
+					}
 				}
-				if ((tk[i] == LEX or tk[i] == AST or tk[i] == TAC or tk[i] == HIR or tk[i] == LIR or tk[i] == ASM)) {
+
+				if (tk[i] == LEX or tk[i] == AST or tk[i] == TAC or tk[i] == HIR or tk[i] == LIR or tk[i] == ASM) {
 					is_body = false;
 					is_cond = true;
 				}
 				else if (tk[i] == NEWLINE and is_cond) {
 					pattern->back().condition.push_back({});
-					pattern->back().condition.back().vector_level = -cond_level - 1;
 					pattern->back().condition.back().command_type = CMD_END_COND;
 					is_cond = false;
 					is_body = true;
+
+					body_stack.clear();
+					BodyFrame root;
+					root.type = 0;
+					root.lbl1 = 0;
+					root.lbl2 = 0;
+					body_stack.push_back(root);
 				}
 
 			}
@@ -215,462 +268,450 @@ namespace mengine {
 			}
 		}
 
-		void match(int i_pattern) {
-			std::unordered_map<uint32_t, btree::Token> captured_tokens;
+        void match(int i_pattern) {
+            std::unordered_map<uint32_t, btree::Token> captured_tokens;
 
-			for (int i = 0; i < btree::get_length(); i++) {
+            for (int i = 0; i < btree::get_length(); i++) {
 
-				int start_replace = i;
-				int csize = lex_pattern[i_pattern].condition.size();
+                int start_replace = i;
+                int csize = lex_pattern[i_pattern].condition.size();
 
-				struct Level {
-					int mode_level = 0;
-					int icond_start = 0;
-					int icond = 0;
-					int icond_return = 0;
-					int iter_i = 0;
-					bool result_match = true;
-					int repeats = 0;
-				};
+                bool result_match = true;
+                int ci = 0;
 
-				std::vector<Level> level;
-				level.push_back({});
+                while (ci < csize) {
+                    uint32_t type_command = lex_pattern[i_pattern].condition[ci].command_type;
 
-				int pending_repeats = 0;
+                    if (type_command == CMD_TOKWN or type_command == CMD_TOK) {
+                        uint32_t input_token = btree::get(i).name;
+                        uint32_t token_name = lex_pattern[i_pattern].condition[ci].comand[0];
+                        if (type_command == CMD_TOK) {
+                            uint32_t id_tok = lex_pattern[i_pattern].condition[ci].comand[1];
+                            captured_tokens[id_tok] = btree::get(i);
+                        }
 
-				while (level.back().icond < csize) {
+                        if (token_name == input_token or token_name == TOKEN or (token_name == wORD and input_token != NEWLINE)) {
+                            result_match = true;
+                            i++;
+                        }
+                        else {
+                            result_match = false;
+                        }
+                        ci++;
+                    }
+                    else if (type_command == CMD_AND) {
+                        if (!result_match) {
+                            ci = csize;
+                        }
+                        else {
+                            ci++;
+                        }
+                    }
+                    else if (type_command == CMD_OR) {
+                        if (result_match) {
+                            int k = ci + 1;
+                            while (k < csize) {
+                                uint32_t t = lex_pattern[i_pattern].condition[k].command_type;
+                                if (t == CMD_AND or t == CMD_END_COND) break;
+                                k++;
+                            }
+                            ci = k;
+                        }
+                        else {
+                            ci++;
+                        }
+                    }
+                    else {
+                        ci++;
+                    }
+                }
 
-					int ci = level.back().icond;
-					uint32_t type_command = lex_pattern[i_pattern].condition[ci].command_type;
-					int vector_level = lex_pattern[i_pattern].condition[ci].vector_level;
+                struct Macro_var {
+                    int64_t value = 0;
+                    std::string type = "";
+                    std::string str_value = "";
+                };
 
-					if (type_command == CMD_REP) {
-						pending_repeats++;
-						level.back().icond++;
-						continue;
-					}
+                std::unordered_map<uint32_t, Macro_var> macro_vars;
 
-					if (vector_level > 0) {
-						bool inside = (level.size() > 1) and (ci == level.back().icond_start);
-						if (!inside) {
-							int parent_icond = ci;
+                if (result_match and i > start_replace) {
 
-							int ret = csize;
-							int depth = 0;
-							for (int k = ci + 1; k < csize; k++) {
-								int k_vl = lex_pattern[i_pattern].condition[k].vector_level;
-								if (k_vl > 0) {
-									depth += k_vl;
-								}
-								else if (k_vl < 0) {
-									if (depth == 0) {
-										ret = k + 1;
-										break;
-									}
-									else {
-										depth += k_vl;
-									}
-								}
-							}
+                    btree::create_tree("buffer");
+                    btree::use("buffer");
 
-							level.back().icond_return = ret;
-							level.back().icond = ci + 1;
+                    std::vector<btree::Token>& body = lex_pattern[i_pattern].body;
+                    bool canceled = false;
 
-							int remaining = vector_level;
-							while (remaining > 0) {
-								int mode = (pending_repeats > 0) ? 1 : 0;
-								Level nl;
-								nl.mode_level = mode;
-								nl.icond_start = parent_icond;
-								nl.icond = parent_icond;
-								nl.icond_return = ret;
-								nl.iter_i = i;
-								nl.result_match = true;
-								nl.repeats = 0;
-								level.push_back(nl);
-								if (pending_repeats > 0) pending_repeats--;
-								remaining--;
-							}
-							continue;
-						}
-					}
+                    for (int ii = 0; ii < body.size() - 50; ) {
 
-					if (vector_level < 0) {
-						if (level.back().mode_level == 1 and level.back().result_match) {
-							level.back().icond = level.back().icond_start;
-							level.back().iter_i = i;
-							level.back().repeats++;
-							level.back().result_match = true;
-							continue;
-						}
+                        if (body[ii].name == PCANCEL) { canceled = true; break; }
+                        else if (body[ii].name == PNEWLINE) { btree::push_back({ btree::gen_id(), NEWLINE });ii++; }
+                        //<123>.asd = afefef
+                        //<123>.asd = 0a
+                        else if (is_concurrence(body, ii, 7, LT, ANY, GT, DOT, ANY, EQ, ANY)) {
+                            auto it = captured_tokens.find(body[ii + 1].name);
 
-						bool child_result = (level.back().repeats > 0) ? true : level.back().result_match;
+                            if (it != captured_tokens.end()) {
+                                if (macro_vars.contains(body[ii + 6].name)) {
+                                    props::set(it->second.name, it->second.id, body[ii + 4].name, intern(std::to_string(macro_vars[body[ii + 6].name].value)));
+                                }
+                                else {
+                                    props::set(it->second.name, it->second.id, body[ii + 4].name, body[ii + 6].name);
+                                }
 
-						if (level.size() == 1) {
-							level.back().result_match = child_result;
-							level.back().icond = csize;
-							continue;
-						}
+                            }
+                            ii += resize_ii;
+                        }
+                        // <0> = 0k   (rename captured token, только если 0k — объявленная pstring-макропеременная)
+                        else if (is_concurrence(body, ii, 5, LT, ANY, GT, EQ, ANY)
+                            && macro_vars.contains(body[ii + 4].name))
+                        {
+                            auto it = captured_tokens.find(body[ii + 1].name);
+                            if (it != captured_tokens.end()) {
+                                auto& mv = macro_vars[body[ii + 4].name];
+                                if (mv.type != "pstring") {
+                                    std::cout << "macro bastard: rename requires pstring, got '"
+                                        << mv.type << "'" << std::endl;
+                                    exit(-1);
+                                }
+                                it->second.name = intern(mv.str_value);
+                            }
+                            ii += resize_ii;
+                        }
+                        //<123>.asd
+                        else if (is_concurrence(body, ii, 5, LT, ANY, GT, DOT, ANY)) {
+                            auto it = captured_tokens.find(body[ii + 1].name);
+                            if (it != captured_tokens.end()) {
 
-						int ret = level.back().icond_return;
-						level.pop_back();
-						level.back().result_match = child_result;
-						level.back().icond = ret;
-						continue;
-					}
+                                uint32_t val = props::get(it->second.name, it->second.id, body[ii + 4].name);
+                                if (val == NOT_FOUND) {
+                                    std::cout << "macro bastard: property '" << get_str(body[ii + 4].name) << "' not found on token <" << get_str(body[ii + 1].name) << ">" << std::endl;
+                                    exit(-1);
+                                }
+                                btree::push_back({ btree::gen_id(), val });
+                            }
+                            ii += resize_ii;
+                        }
 
-					if (type_command == CMD_TOKWN or type_command == CMD_TOK) {
-						uint32_t input_token = btree::get(i).name;
-						uint32_t token_name = lex_pattern[i_pattern].condition[ci].comand[0];
-						if (type_command == CMD_TOK) {
-							uint32_t id_tok = lex_pattern[i_pattern].condition[ci].comand[1];
-							captured_tokens[id_tok] = btree::get(i);
-						}
+                        //<123>
+                        else if (is_concurrence(body, ii, 3, LT, ANY, GT) and captured_tokens.contains(body[ii + 1].name)) {
+                            btree::push_back(captured_tokens[body[ii + 1].name]);
+                            ii += resize_ii;
+                        }
+                        // pstring 0a
+                            // pstring 0a = <0>
+                        else if (body[ii].name == pSTRING) {
+                            if (!is_macro_var(get_str(body[ii + 1].name))) {
+                                std::cout << "macro bastard: 'pstring' expects var name, got '" << get_str(body[ii + 1].name) << "'" << std::endl;
+                                exit(-1);
+                            }
 
-						if (token_name == input_token or token_name == TOKEN or (token_name == wORD and input_token != NEWLINE)) {
-							level.back().result_match = true;
-							i++;
-						}
-						else {
-							level.back().result_match = false;
-							if (level.back().mode_level == 1) {
-								i = level.back().iter_i;
-							}
-						}
-						level.back().icond++;
-					}
-					else if (type_command == CMD_AND) {
-						if (!level.back().result_match) {
-							level.back().icond = csize - 1;
-						}
-						else {
-							level.back().icond++;
-						}
-					}
-					else if (type_command == CMD_OR) {
-						if (level.back().result_match) {
-							int k = ci + 1;
-							while (k < csize) {
-								uint32_t t = lex_pattern[i_pattern].condition[k].command_type;
-								if (t == CMD_AND or t == CMD_END_COND) break;
-								k++;
-							}
-							level.back().icond = k;
-						}
-						else {
-							level.back().icond++;
-						}
-					}
-					else {
-						level.back().icond++;
-					}
-				}
+                            if (macro_vars.contains(body[ii + 1].name) and macro_vars[body[ii + 1].name].type != "" and macro_vars[body[ii + 1].name].type != "pstring") {
+                                std::cout << "macro bastard: var '" << get_str(body[ii + 1].name) << "' already declared as '" << macro_vars[body[ii + 1].name].type << "'" << std::endl;
+                                exit(-1);
+                            }
 
-				struct Macro_var {
-					int64_t value = 0;
-					std::string type = "";
-				};
+                            macro_vars[body[ii + 1].name].type = "pstring";
 
-				std::unordered_map<uint32_t, Macro_var> macro_vars;
+                            if (body[ii + 2].name == EQ or body[ii + 2].name == PLUS or body[ii + 2].name == MINUS) {
+                                ii += 1; // оставляем ii на имени — следующая итерация разберёт присваивание
+                            }
+                            else {
+                                ii += 2; // чистое объявление — пропускаем и pSTRING, и имя
+                            }
+                        }
+                        // pint 0a
+                        // pint 0a = 10
+                        else if (body[ii].name == pINT) {
+                            if (!is_macro_var(get_str(body[ii + 1].name))) {
+                                std::cout << "macro bastard: 'pint' expects var name, got '" << get_str(body[ii + 1].name) << "'" << std::endl;
+                                exit(-1);
+                            }
 
-				if (level[0].result_match and i > start_replace) {
+                            if (macro_vars.contains(body[ii + 1].name) and macro_vars[body[ii + 1].name].type != "" and macro_vars[body[ii + 1].name].type != "pint") {
+                                std::cout << "macro bastard: var '" << get_str(body[ii + 1].name) << "' already declared as '" << macro_vars[body[ii + 1].name].type << "'" << std::endl;
+                                exit(-1);
+                            }
 
-					btree::create_tree("buffer");
-					btree::use("buffer");
+                            macro_vars[body[ii + 1].name].type = "pint";
 
-					std::vector<btree::Token>& body = lex_pattern[i_pattern].body;
+                            if (body[ii + 2].name == EQ or body[ii + 2].name == PLUS or body[ii + 2].name == MINUS) {
+                                ii += 1; // пусть присваивание разберётся на следующей итерации
+                            }
+                            else {
+                                ii += 2; // объявление без инициализации
+                            }
+                        }
 
-					for (int ii = 0; ii < body.size() - 50; ) {
+                        //0a = ...
+                        else if (is_macro_var(get_str(body[ii].name))) {
+                            if (is_concurrence(body, ii, 7, ANY, EQ, LT, ANY, GT, DOT, ANY)) {
 
-						//<123>.asd = afefef
-						//<123>.asd = 0a
-						if (is_concurrence(body, ii, 7, LT, ANY, GT, DOT, ANY, EQ, ANY)) {
-							auto it = captured_tokens.find(body[ii + 1].name);
+                                if (!macro_vars.contains(body[ii].name)) {
+                                    std::cout << "macro bastard: macro var '" << get_str(body[ii].name) << "' not found" << std::endl;
+                                    exit(-1);
+                                }
 
-							if (it != captured_tokens.end()) {
-								if (macro_vars.contains(body[ii + 6].name)) {
-									props::set(it->second.name, it->second.id, body[ii + 4].name, intern(std::to_string(macro_vars[body[ii + 6].name].value)));
-								}
-								else {
-									props::set(it->second.name, it->second.id, body[ii + 4].name, body[ii + 6].name);
-								}
+                                if (macro_vars[body[ii].name].type != "pint") {
+                                    std::cout << "macro bastard: macro var '" << get_str(body[ii].name) << "' is not pint" << std::endl;
+                                    exit(-1);
+                                }
 
-							}
-							ii += resize_ii;
-						}
-						//<123>.asd
-						else if (is_concurrence(body, ii, 5, LT, ANY, GT, DOT, ANY)) {
-							auto it = captured_tokens.find(body[ii + 1].name);
-							if (it != captured_tokens.end()) {
+                                auto it = captured_tokens.find(body[ii + 3].name);
+                                if (it == captured_tokens.end()) {
+                                    std::cout << "macro bastard: capture '" << get_str(body[ii + 3].name) << "' not found" << std::endl;
+                                    exit(-1);
+                                }
 
-								uint32_t val = props::get(it->second.name, it->second.id, body[ii + 4].name);
-								if (val == ANY) {
-									std::cout << "macro bastard: property '" << get_str(body[ii + 4].name) << "' not found on token <" << get_str(body[ii + 1].name) << ">" << std::endl;
-									exit(-1);
-								}
-								btree::push_back({ btree::gen_id(), val });
-							}
-							ii += resize_ii;
-						}
-						//<123>
-						else if (is_concurrence(body, ii, 3, LT, ANY, GT) and captured_tokens.contains(body[ii + 1].name)) {
-							btree::push_back(captured_tokens[body[ii + 1].name]);
-							ii += resize_ii;
-						}
+                                uint32_t val = props::get(it->second.name, it->second.id, body[ii + 6].name);
+                                if (val == NOT_FOUND) {
+                                    std::cout << "macro bastard: property '" << get_str(body[ii + 6].name) << "' not found on token <" << get_str(body[ii + 3].name) << ">" << std::endl;
+                                    exit(-1);
+                                }
 
-						// pint 0a = 10
-						else if (body[ii].name == pINT) {
-							if (!is_macro_var(get_str(body[ii + 1].name))) {
-								std::cout << "macro bastard: 'pint' expects var name, got '"
-									<< get_str(body[ii + 1].name) << "'" << std::endl;
-								exit(-1);
-							}
+                                if (!is_int_sid(val)) {
+                                    std::cout << "macro bastard: property '" << get_str(body[ii + 6].name) << "' on token <" << get_str(body[ii + 3].name) << "> is not integer (value='" << get_str(val) << "')" << std::endl;
+                                    exit(-1);
+                                }
 
-							if (macro_vars.contains(body[ii + 1].name)
-								and macro_vars[body[ii + 1].name].type != ""
-								and macro_vars[body[ii + 1].name].type != "pint") {
-								std::cout << "macro bastard: var '" << get_str(body[ii + 1].name)
-									<< "' already declared as '"
-									<< macro_vars[body[ii + 1].name].type << "'" << std::endl;
-								exit(-1);
-							}
+                                macro_vars[body[ii].name].value = get_num(val);
+                                ii += resize_ii;
+                            }
+                            else if (is_concurrence(body, ii, 5, ANY, EQ, LT, ANY, GT)) {
 
-							macro_vars[body[ii + 1].name].type = "pint";
-							ii += 1;
-						}
+                                if (!macro_vars.contains(body[ii].name)) {
+                                    std::cout << "macro bastard: macro var '" << get_str(body[ii].name) << "' not found" << std::endl;
+                                    exit(-1);
+                                }
 
-						//0a = ...
-						else if (is_macro_var(get_str(body[ii].name))) {
-							if (is_concurrence(body, ii, 7, ANY, EQ, LT, ANY, GT, DOT, ANY)) {
+                                auto it = captured_tokens.find(body[ii + 3].name);
+                                if (it == captured_tokens.end()) {
+                                    std::cout << "macro bastard: capture '" << get_str(body[ii + 3].name) << "' not found" << std::endl;
+                                    exit(-1);
+                                }
 
-								if (!macro_vars.contains(body[ii].name)) {
-									std::cout << "macro bastard: macro var '" << get_str(body[ii].name) << "' not found" << std::endl;
-									exit(-1);
-								}
+                                const std::string& src = get_str(it->second.name);
 
-								if (macro_vars[body[ii].name].type != "pint") {
-									std::cout << "macro bastard: macro var '" << get_str(body[ii].name) << "' is not pint" << std::endl;
-									exit(-1);
-								}
+                                if (macro_vars[body[ii].name].type == "pint") {
+                                    if (!is_int_sid(it->second.name)) {
+                                        std::cout << "macro bastard: macro var '" << get_str(body[ii].name)
+                                            << "' is pint, but loaded token '" << src
+                                            << "' (captured as <" << get_str(body[ii + 3].name) << ">) is not integer" << std::endl;
+                                        exit(-1);
+                                    }
+                                    macro_vars[body[ii].name].value = get_num(it->second.name);
+                                }
+                                else if (macro_vars[body[ii].name].type == "pstring") {
+                                    macro_vars[body[ii].name].str_value = src;
+                                }
+                                else {
+                                    std::cout << "macro bastard: macro var '" << get_str(body[ii].name)
+                                        << "' has unknown type '" << macro_vars[body[ii].name].type << "'" << std::endl;
+                                    exit(-1);
+                                }
 
-								auto it = captured_tokens.find(body[ii + 3].name);
-								if (it == captured_tokens.end()) {
-									std::cout << "macro bastard: capture '" << get_str(body[ii + 3].name) << "' not found" << std::endl;
-									exit(-1);
-								}
+                                ii += resize_ii;
+                            }
+                            else if (is_concurrence(body, ii, 3, ANY, EQ, ANY)) {
+                                if (!macro_vars.contains(body[ii].name)) {
+                                    std::cout << "macro bastard: macro var '" << get_str(body[ii].name) << "' not found" << std::endl;
+                                    exit(-1);
+                                }
 
-								uint32_t val = props::get(it->second.name, it->second.id, body[ii + 6].name);
-								if (val == ANY) {
-									std::cout << "macro bastard: property '" << get_str(body[ii + 6].name) << "' not found on token <" << get_str(body[ii + 3].name) << ">" << std::endl;
-									exit(-1);
-								}
+                                auto& dst = macro_vars[body[ii].name];
+                                uint32_t rhs = body[ii + 2].name;
 
-								if (!is_int_sid(val)) {
-									std::cout << "macro bastard: property '" << get_str(body[ii + 6].name) << "' on token <" << get_str(body[ii + 3].name) << "> is not integer (value='" << get_str(val) << "')" << std::endl;
-									exit(-1);
-								}
+                                if (dst.type == "pint") {
+                                    if (is_macro_var(get_str(rhs))) {
+                                        if (!macro_vars.contains(rhs)) {
+                                            std::cout << "macro bastard: macro var '" << get_str(rhs) << "' not found" << std::endl;
+                                            exit(-1);
+                                        }
+                                        if (macro_vars[rhs].type != "pint") {
+                                            std::cout << "macro bastard: macro var '" << get_str(rhs)
+                                                << "' is not pint (type='" << macro_vars[rhs].type << "')" << std::endl;
+                                            exit(-1);
+                                        }
+                                        dst.value = macro_vars[rhs].value;
+                                        ii += resize_ii;
+                                    }
+                                    else if (is_int_sid(rhs)) {
+                                        dst.value = get_num(rhs);
+                                        ii += resize_ii;
+                                    }
+                                    else {
+                                        std::cout << "macro bastard: macro var or token '" << get_str(rhs) << "' not int" << std::endl;
+                                        exit(-1);
+                                    }
+                                }
+                                else if (dst.type == "pstring") {
+                                    if (is_macro_var(get_str(rhs))) {
+                                        if (!macro_vars.contains(rhs)) {
+                                            std::cout << "macro bastard: macro var '" << get_str(rhs) << "' not found" << std::endl;
+                                            exit(-1);
+                                        }
+                                        if (macro_vars[rhs].type != "pstring") {
+                                            std::cout << "macro bastard: macro var '" << get_str(rhs)
+                                                << "' is not pstring (type='" << macro_vars[rhs].type << "')" << std::endl;
+                                            exit(-1);
+                                        }
+                                        dst.str_value = macro_vars[rhs].str_value;
+                                        ii += resize_ii;
+                                    }
+                                    else {
+                                        dst.str_value = get_str(rhs);
+                                        ii += resize_ii;
+                                    }
+                                }
+                                else {
+                                    std::cout << "macro bastard: macro var '" << get_str(body[ii].name)
+                                        << "' has unknown type '" << dst.type << "'" << std::endl;
+                                    exit(-1);
+                                }
+                            }
+                            else if (is_concurrence(body, ii, 4, ANY, PLUS, EQ, ANY)) {
+                                if (!macro_vars.contains(body[ii].name)) {
+                                    std::cout << "macro bastard: macro var '" << get_str(body[ii].name) << "' not found" << std::endl;
+                                    exit(-1);
+                                }
+                                if (macro_vars[body[ii].name].type != "pint") {
+                                    std::cout << "macro bastard: macro var '" << get_str(body[ii].name)
+                                        << "' is not pint (type='" << macro_vars[body[ii].name].type << "')" << std::endl;
+                                    exit(-1);
+                                }
+                                if (!is_int_sid(body[ii + 3].name)) {
+                                    std::cout << "macro bastard: token '" << get_str(body[ii + 3].name) << "' not int" << std::endl;
+                                    exit(-1);
+                                }
+                                macro_vars[body[ii].name].value += get_num(body[ii + 3].name);
+                                ii += resize_ii;
+                            }
+                            else if (is_concurrence(body, ii, 4, ANY, MINUS, EQ, ANY)) {
+                                if (!macro_vars.contains(body[ii].name)) {
+                                    std::cout << "macro bastard: macro var '" << get_str(body[ii].name) << "' not found" << std::endl;
+                                    exit(-1);
+                                }
+                                if (macro_vars[body[ii].name].type != "pint") {
+                                    std::cout << "macro bastard: macro var '" << get_str(body[ii].name)
+                                        << "' is not pint (type='" << macro_vars[body[ii].name].type << "')" << std::endl;
+                                    exit(-1);
+                                }
+                                if (!is_int_sid(body[ii + 3].name)) {
+                                    std::cout << "macro bastard: token '" << get_str(body[ii + 3].name) << "' not int" << std::endl;
+                                    exit(-1);
+                                }
+                                macro_vars[body[ii].name].value -= get_num(body[ii + 3].name);
+                                ii += resize_ii;
+                            }
+                            else {
+                                if (!macro_vars.contains(body[ii].name)) {
+                                    std::cout << "macro bastard: macro var '" << get_str(body[ii].name) << "' not found" << std::endl;
+                                    exit(-1);
+                                }
+                                if (macro_vars[body[ii].name].type == "pint") {
+                                    btree::push_back({ btree::gen_id(), intern(std::to_string(macro_vars[body[ii].name].value)) });
 
-								macro_vars[body[ii].name].value = get_num(val);
-								ii += resize_ii;
-							}
-							else if (is_concurrence(body, ii, 5, ANY, EQ, LT, ANY, GT)) {
+                                }
+                                else if (macro_vars[body[ii].name].type == "pstring") {
+                                    btree::push_back({ btree::gen_id(), intern(macro_vars[body[ii].name].str_value) });
 
-								if (!macro_vars.contains(body[ii].name)) {
-									std::cout << "macro bastard: macro var '" << get_str(body[ii].name) << "' not found" << std::endl;
-									exit(-1);
-								}
+                                }
+                                ii++;
+                            }
+                        }
+                        //
+                        else if (body[ii].name == PIF) {
 
-								if (macro_vars[body[ii].name].type != "pint") {
-									std::cout << "macro bastard: macro var '" << get_str(body[ii].name)
-										<< "' is not pint (type='" << macro_vars[body[ii].name].type << "')" << std::endl;
-									exit(-1);
-								}
+                            if (is_concurrence(body, ii, 7, PIF, ANY, ANY, EQ, ANY, ELSE, ANY) or is_concurrence(body, ii, 6, PIF, ANY, ANY, ANY, ELSE, ANY)) {
+                                int offset = (resize_ii == 7) ? 0 : -1; // 7-токен: b на ii+4, 6-токен: b на ii+3
 
-								auto it = captured_tokens.find(body[ii + 3].name);
-								if (it == captured_tokens.end()) {
-									std::cout << "macro bastard: capture '" << get_str(body[ii + 3].name) << "' not found" << std::endl;
-									exit(-1);
-								}
+                                int64_t a = 0, b = 0;
+                                bool a_is_int = false, b_is_int = false;
+                                std::string a_str, b_str;
 
-								if (!is_int_sid(it->second.name)) {
-									std::cout << "macro bastard: token name '" << get_str(it->second.name)
-										<< "' (captured as <" << get_str(body[ii + 3].name) << ">) is not integer" << std::endl;
-									exit(-1);
-								}
+                                if (is_int_sid(body[ii + 1].name)) { a = get_num(body[ii + 1].name); a_is_int = true; a_str = get_str(body[ii + 1].name); }
+                                else if (macro_vars.contains(body[ii + 1].name) and macro_vars[body[ii + 1].name].type == "pint") { a = macro_vars[body[ii + 1].name].value; a_is_int = true; a_str = std::to_string(a); }
+                                else if (macro_vars.contains(body[ii + 1].name) and macro_vars[body[ii + 1].name].type == "pstring") { a_str = macro_vars[body[ii + 1].name].str_value; }
+                                else { a_str = get_str(body[ii + 1].name); }
 
-								macro_vars[body[ii].name].value = get_num(it->second.name);
-								ii += resize_ii;
-							}
-							else if (is_concurrence(body, ii, 3, ANY, EQ, ANY)) {
-								if (!macro_vars.contains(body[ii].name)) {
-									std::cout << "macro bastard: macro var '" << get_str(body[ii].name) << "' not found" << std::endl;
-									exit(-1);
-								}
-								if (macro_vars[body[ii].name].type != "pint") {
-									std::cout << "macro bastard: macro var '" << get_str(body[ii].name)
-										<< "' is not pint (type='" << macro_vars[body[ii].name].type << "')" << std::endl;
-									exit(-1);
-								}
+                                if (is_int_sid(body[ii + 4 + offset].name)) { b = get_num(body[ii + 4 + offset].name); b_is_int = true; b_str = get_str(body[ii + 4 + offset].name); }
+                                else if (macro_vars.contains(body[ii + 4 + offset].name) and macro_vars[body[ii + 4 + offset].name].type == "pint") { b = macro_vars[body[ii + 4 + offset].name].value; b_is_int = true; b_str = std::to_string(b); }
+                                else if (macro_vars.contains(body[ii + 4 + offset].name) and macro_vars[body[ii + 4 + offset].name].type == "pstring") { b_str = macro_vars[body[ii + 4 + offset].name].str_value; }
+                                else { b_str = get_str(body[ii + 4 + offset].name); }
 
-								if (is_macro_var(get_str(body[ii + 2].name))) {
-									if (!macro_vars.contains(body[ii + 2].name)) {
-										std::cout << "macro bastard: macro var '" << get_str(body[ii + 2].name) << "' not found" << std::endl;
-										exit(-1);
-									}
-									if (macro_vars[body[ii + 2].name].type != "pint") {
-										std::cout << "macro bastard: macro var '" << get_str(body[ii + 2].name)
-											<< "' is not pint (type='" << macro_vars[body[ii + 2].name].type << "')" << std::endl;
-										exit(-1);
-									}
-									macro_vars[body[ii].name].value = macro_vars[body[ii + 2].name].value;
-									ii += resize_ii;
-								}
-								else if (is_int_sid(body[ii + 2].name)) {
-									macro_vars[body[ii].name].value = get_num(body[ii + 2].name);
-									ii += resize_ii;
-								}
-								else {
-									std::cout << "macro bastard: macro var or token '" << get_str(body[ii + 2].name) << "' not int" << std::endl;
-									exit(-1);
-								}
-							}
-							else if (is_concurrence(body, ii, 4, ANY, PLUS, EQ, ANY)) {
-								if (!macro_vars.contains(body[ii].name)) {
-									std::cout << "macro bastard: macro var '" << get_str(body[ii].name) << "' not found" << std::endl;
-									exit(-1);
-								}
-								if (macro_vars[body[ii].name].type != "pint") {
-									std::cout << "macro bastard: macro var '" << get_str(body[ii].name)
-										<< "' is not pint (type='" << macro_vars[body[ii].name].type << "')" << std::endl;
-									exit(-1);
-								}
-								if (!is_int_sid(body[ii + 3].name)) {
-									std::cout << "macro bastard: token '" << get_str(body[ii + 3].name) << "' not int" << std::endl;
-									exit(-1);
-								}
-								macro_vars[body[ii].name].value += get_num(body[ii + 3].name);
-								ii += resize_ii;
-							}
-							else if (is_concurrence(body, ii, 4, ANY, MINUS, EQ, ANY)) {
-								if (!macro_vars.contains(body[ii].name)) {
-									std::cout << "macro bastard: macro var '" << get_str(body[ii].name) << "' not found" << std::endl;
-									exit(-1);
-								}
-								if (macro_vars[body[ii].name].type != "pint") {
-									std::cout << "macro bastard: macro var '" << get_str(body[ii].name)
-										<< "' is not pint (type='" << macro_vars[body[ii].name].type << "')" << std::endl;
-									exit(-1);
-								}
-								if (!is_int_sid(body[ii + 3].name)) {
-									std::cout << "macro bastard: token '" << get_str(body[ii + 3].name) << "' not int" << std::endl;
-									exit(-1);
-								}
-								macro_vars[body[ii].name].value -= get_num(body[ii + 3].name);
-								ii += resize_ii;
-							}
-							else {
-								if (!macro_vars.contains(body[ii].name)) {
-									std::cout << "macro bastard: macro var '" << get_str(body[ii].name) << "' not found" << std::endl;
-									exit(-1);
-								}
-								if (macro_vars[body[ii].name].type != "pint") {
-									std::cout << "macro bastard: macro var '" << get_str(body[ii].name)
-										<< "' is not pint (type='" << macro_vars[body[ii].name].type << "')" << std::endl;
-									exit(-1);
-								}
-								btree::push_back({ btree::gen_id(), intern(std::to_string(macro_vars[body[ii].name].value)) });
-								ii++;
-							}
-						}
+                                bool only_int = a_is_int and b_is_int;
 
-						else if (body[ii].name == PIF) {
-							if (is_concurrence(body, ii, 7, PIF, ANY, ANY, EQ, ANY, ELSE, ANY)) {
-								int64_t a, b;
-								if (is_int_sid(body[ii + 1].name)) a = get_num(body[ii + 1].name);
-								else if (macro_vars.contains(body[ii + 1].name)) a = macro_vars[body[ii + 1].name].value;
-								else a = 0;
+                                uint32_t op_first = body[ii + 2].name;
+                                bool result = false;
+                                if (only_int) {
+                                    if (op_first == BANG) {
+                                        if (a != b) { result = true; ii += resize_ii; }
+                                    }
+                                    else if (op_first == EQ) {
+                                        if (a == b) { result = true; ii += resize_ii; }
+                                    }
+                                    else if (op_first == LT) {
 
-								if (is_int_sid(body[ii + 4].name)) b = get_num(body[ii + 4].name);
-								else if (macro_vars.contains(body[ii + 4].name)) b = macro_vars[body[ii + 4].name].value;
-								else b = 0;
+                                        if (offset == 0 and a <= b) { result = true; ii += resize_ii; }
+                                        else if (offset == -1 and a < b) { result = true; ii += resize_ii; }
+                                    }
+                                    else if (op_first == GT) {
+                                        if (offset == 0 and a >= b) { result = true; ii += resize_ii; }
+                                        else if (offset == -1 and a > b) { result = true; ii += resize_ii; }
+                                    }
+                                }
+                                else {
+                                    if (op_first == LT or op_first == GT) {
+                                        std::cout << "macro bastard: cannot compare strings with '<=' or '>=' ('" << a_str << "' " << get_str(op_first) << " '" << b_str << "')" << std::endl;
+                                        exit(-1);
+                                    }
+                                    else if (op_first == BANG) {
+                                        if (a_str != b_str) { result = true; ii += resize_ii; }
+                                    }
+                                    else if (op_first == EQ) {
+                                        if (a_str == b_str) { result = true; ii += resize_ii; }
+                                    }
+                                }
+                                if (!result) {
+                                    goto_label(body, ii += 6 + offset);
+                                }
+                            }
 
-								uint32_t op_first = body[ii + 2].name;
-								bool result = false;
+                        }
 
-								if (op_first == BANG) {
-									if (a != b) { result = true; ii += resize_ii; }
-								}
-								else if (op_first == EQ) {
-									if (a == b) { result = true; ii += resize_ii; }
-								}
-								else if (op_first == LT) {
-									if (a <= b) { result = true; ii += resize_ii; }
-								}
-								else if (op_first == GT) {
-									if (a >= b) { result = true; ii += resize_ii; }
-								}
-								if (!result) {
-									goto_label(body, ii += 6);
-								}
-							}
+                        else if (body[ii].name == PLABEL) {
+                            ii += 2;
+                        }
+                        else if (body[ii].name == PGOTO) {
+                            goto_label(body, ii += 1);
+                        }
+                        else {
+                            if (body[ii].name != 0) {
+                                push_back(body[ii]);
+                                ii++;
+                            }
+                        }
 
-							if (is_concurrence(body, ii, 6, PIF, ANY, ANY, ANY, ELSE, ANY)) {
-								int64_t a, b;
-								if (is_int_sid(body[ii + 1].name)) a = get_num(body[ii + 1].name);
-								else if (macro_vars.contains(body[ii + 1].name)) a = macro_vars[body[ii + 1].name].value;
-								else a = 0;
+                    }
 
-								if (is_int_sid(body[ii + 3].name)) b = get_num(body[ii + 3].name);
-								else if (macro_vars.contains(body[ii + 3].name)) b = macro_vars[body[ii + 3].name].value;
-								else b = 0;
+                    if (canceled) {
+                        btree::use("main");
+                        btree::destroy_tree("buffer");
+                        i = start_replace;
+                    }
+                    else {
+                        btree::move_in("main", start_replace, i);
+                        btree::use("main");
+                        i += btree::get_resize() - 1;
+                    }
+                }
+                else {
+                    i = start_replace;
+                }
 
-								uint32_t op_first = body[ii + 2].name;
-								bool result = false;
+            }
+        }
 
-								if (op_first == LT) {
-									if (a < b) { result = true; ii += resize_ii; }
-								}
-								else if (op_first == GT) {
-									if (a > b) { result = true; ii += resize_ii; }
-								}
-								if (!result) {
-									goto_label(body, ii += 5);
-								}
-							}
-						}
-
-						else if (body[ii].name == PLABEL) {
-							ii += 2;
-						}
-						else if (body[ii].name == PGOTO) {
-							goto_label(body, ii += 1);
-						}
-						else {
-							if (body[ii].name != 0) {
-								push_back(body[ii]);
-								ii++;
-							}
-						}
-
-					}
-
-					btree::move_in("main", start_replace, i);
-					btree::use("main");
-					i += btree::get_resize() - 1;
-				}
-				else {
-					i = start_replace;
-				}
-
-			}
-		}
-
-	}
-
-	namespace ast {
-		void match(btree::Tree& tree) {
-
-		}
 	}
 
 }

@@ -15,11 +15,16 @@
 #pragma once
 
 enum Reserved {
+	NOT_FOUND,
 	PIF,
+	PWHILE,
 	pINT,
+	pSTRING,
 	PLABEL,
 	PGOTO,
 	PEND,
+	PCANCEL,
+
 	LEVEL,
 	LEX,
 	AST,
@@ -35,6 +40,7 @@ enum Reserved {
 	TOK,
 	TOKWN,
 	NEWLINE,
+	PNEWLINE,
 
 	LT,
 	GT,
@@ -58,48 +64,52 @@ enum Reserved {
 struct InternEntry {
 	uint32_t id;
 	std::string text;
-	bool is_int;
-	int64_t num;
+	bool is_int = false;
+	int64_t num = 0;
 };
 
-InternEntry id_table[100000] = {
-	{ PIF,      "pif",      false, 0 },
-	{ pINT,     "pint",     false, 0 },
-	{ PLABEL,   "plabel",   false, 0 },
-	{ PGOTO,    "pgoto",    false, 0 },
-	{ PEND,     "pend",     false, 0 },
-	{ LEVEL,    "level",    false, 0 },
-	{ LEX,      "lex",      false, 0 },
-	{ AST,      "ast",      false, 0 },
-	{ TAC,      "tac",      false, 0 },
-	{ HIR,      "hir",      false, 0 },
-	{ LIR,      "lir",      false, 0 },
-	{ ASM,      "asm",      false, 0 },
-	{ ELSE,     "else",     false, 0 },
-	{ OR,       "or",       false, 0 },
-	{ AND,      "and",      false, 0 },
-	{ REP,      "rep",      false, 0 },
-	{ END_COND, "end_cond", false, 0 },
-	{ TOK,      "tok",      false, 0 },
-	{ TOKWN,    "tokwn",    false, 0 },
-	{ NEWLINE,  "\n",       false, 0 },
-	{ LT,       "<",        false, 0 },
-	{ GT,       ">",        false, 0 },
-	{ EQ,       "=",        false, 0 },
-	{ BANG,     "!",        false, 0 },
-	{ PLUS,     "+",        false, 0 },
-	{ MINUS,    "-",        false, 0 },
-	{ DOT,      ".",        false, 0 },
-	{ COMMA,    ",",        false, 0 },
-	{ LPAREN,   "(",        false, 0 },
-	{ RPAREN,   ")",        false, 0 },
-	{ LBRACK,   "[",        false, 0 },
-	{ RBRACK,   "]",        false, 0 },
-	{ TOKEN,    "token",    false, 0 },
-	{ wORD,     "word",     false, 0 },
-	{ ANY,      "any",      false, 0 },
+InternEntry id_table[1000] = {
+	{ NOT_FOUND, "" },
+	{ PIF,       "pif" },
+	{ PWHILE,    "pwhile" },
+	{ pINT,      "pint" },
+	{ pSTRING,   "pstring" },
+	{ PLABEL,    "plabel" },
+	{ PGOTO,     "pgoto" },
+	{ PEND,      "pend" },
+	{ PCANCEL,   "pcancel" },
+	{ LEVEL,     "level" },
+	{ LEX,       "lex" },
+	{ AST,       "ast" },
+	{ TAC,       "tac" },
+	{ HIR,       "hir" },
+	{ LIR,       "lir" },
+	{ ASM,       "asm" },
+	{ ELSE,      "else" },
+	{ OR,        "or" },
+	{ AND,       "and" },
+	{ REP,       "rep" },
+	{ END_COND,  "end_cond" },
+	{ TOK,       "tok" },
+	{ TOKWN,     "tokwn" },
+	{ NEWLINE,   "\n" },
+	{ PNEWLINE,  "pnewline" },
+	{ LT,        "<" },
+	{ GT,        ">" },
+	{ EQ,        "=" },
+	{ BANG,      "!" },
+	{ PLUS,      "+" },
+	{ MINUS,     "-" },
+	{ DOT,       "." },
+	{ COMMA,     "," },
+	{ LPAREN,    "(" },
+	{ RPAREN,    ")" },
+	{ LBRACK,    "[" },
+	{ RBRACK,    "]" },
+	{ TOKEN,     "token" },
+	{ wORD,      "word" },
+	{ ANY,       "any" },
 };
-
 
 
 #include "interning.h"
@@ -145,8 +155,13 @@ int main(int argc, char* argv[]) {
 	int iii = 0;
 	for (int i = 0; i < btree::get_length(); i++) {
 		btree::Token& tok = btree::get(i);
+		auto abc = get_str(tok.name);
+		std::cout << abc;
+		if (abc != "\n") {
+			std::cout << " ";
 
-		std::cout << get_str(tok.name);
+
+		}
 
 		//if (tok.name == get_str(tok.name)) {
 		//}
@@ -157,6 +172,6 @@ int main(int argc, char* argv[]) {
 			iii++;
 		}
 	}
-//	std::cout << iii;
+	//	std::cout << iii;
 	return 0;
 }

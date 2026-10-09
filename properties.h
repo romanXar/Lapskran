@@ -23,13 +23,13 @@ namespace props {
 
 	uint32_t get(uint32_t name, int id, uint32_t key) {
 		auto it_name = db.find(name);
-		if (it_name == db.end()) return ANY;
+		if (it_name == db.end()) return NOT_FOUND;
 
 		auto it_id = it_name->second.find(id);
-		if (it_id == it_name->second.end()) return ANY;
+		if (it_id == it_name->second.end()) return NOT_FOUND;
 
 		auto it_key = it_id->second.find(key);
-		if (it_key == it_id->second.end()) return ANY;
+		if (it_key == it_id->second.end()) return NOT_FOUND;
 
 		return it_key->second;
 	}

@@ -1,39 +1,10 @@
-clone(abc,6,default)
-clone(456,5,newln)
+1 2 3 4
+5 6 7 8
+9 10 11 12
+13 14 15 16
+0level lex <6 0u>
 
 
-
-0level lex <clone><(><word 0><,><word 1><,><word 2><)>
-pint 0a = 0
-pint 0b = <1>
-
-pstring 0j = <2>
-
-pwhile 0a < 0b
-
-
-<0>
-
-pif 0j == newln 
-
-pnewline
-
-pend
-
-0a += 1
-pend
-
-pend
-
-
-0level lex <456>
-55555
-pend
-
-
-
-0level lex <abc> or <55555>
-ff
 
 pend
 

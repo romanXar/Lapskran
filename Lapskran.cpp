@@ -23,7 +23,6 @@ enum Reserved {
 	PLABEL,
 	PGOTO,
 	PEND,
-	PCANCEL,
 
 	LEVEL,
 	LEX,
@@ -77,7 +76,6 @@ InternEntry id_table[1000] = {
 	{ PLABEL,    "plabel" },
 	{ PGOTO,     "pgoto" },
 	{ PEND,      "pend" },
-	{ PCANCEL,   "pcancel" },
 	{ LEVEL,     "level" },
 	{ LEX,       "lex" },
 	{ AST,       "ast" },

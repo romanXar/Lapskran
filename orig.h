@@ -2,20 +2,8 @@
 
 using namespace std;
 
+vector<string> gen_words_array(string src) {
 
-vector<string> gen_words_array(string path) {
-
-    ifstream file(path, ios::binary);
-    if (!file) { exit(1); }
-
-    file.seekg(0, ios::end);
-    size_t size = (size_t)file.tellg();
-    file.seekg(0, ios::beg);
-
-    string src(size, '\0');
-    file.read(&src[0], size);
-    file.close();
-    
     // убрать BOM
     if (src.size() >= 3 &&
         (unsigned char)src[0] == 0xEF &&
@@ -29,7 +17,7 @@ vector<string> gen_words_array(string path) {
 
     for (size_t i = 0; i < src.size(); i++) {
         char c = src[i];
-        
+
         if (c == '"') {
             if (!token.empty()) { tokens.push_back(token); token.clear(); }
             token += c;
@@ -38,20 +26,20 @@ vector<string> gen_words_array(string path) {
                 token += src[i];
                 i++;
             }
-            if (i < src.size()) { token += src[i]; } 
+            if (i < src.size()) { token += src[i]; }
             tokens.push_back(token);
             token.clear();
             continue;
         }
         if (c == '\r') { continue; }
 
-        if (c == ' ' || c == '\t'  || c == '\n') {
+        if (c == ' ' || c == '\t' || c == '\n') {
             if (!token.empty()) { tokens.push_back(token); token.clear(); }
-            
-            tokens.push_back(string(1,c));
+
+            tokens.push_back(string(1, c));
             continue;
         }
-        
+
         if (c == '=' || c == '<' || c == '>' || c == '!' ||
             c == '+' || c == '-' || c == '*' || c == '/' || c == '%' ||
             c == '&' || c == '|' || c == '^' || c == '~' || c == '?' || c == ':' || c == '.' || c == ',' || c == '(' || c == ')') {
@@ -59,9 +47,7 @@ vector<string> gen_words_array(string path) {
             tokens.push_back(string(1, c));
             continue;
         }
-      
-       
-        
+
         token += c;
     }
 

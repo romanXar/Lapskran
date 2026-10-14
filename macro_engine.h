@@ -426,7 +426,17 @@ namespace mengine {
 								uint32_t val;
 
 								if (macro_vars.contains(body[ii + 6].name)) {
-									val = intern(std::to_string(macro_vars[body[ii + 6].name].value));
+									auto& mv = macro_vars[body[ii + 6].name];
+									if (mv.type == "pstring") {
+										val = intern(mv.str_value);
+									}
+									else if (mv.type == "pint") {
+										val = intern(std::to_string(mv.value));
+									}
+									else {
+										std::cout << "macro bastard: property rhs var '" << get_str(body[ii + 6].name) << "' has unknown type '" << mv.type << "'" << std::endl;
+										exit(-1);
+									}
 								}
 								else {
 									val = body[ii + 6].name;

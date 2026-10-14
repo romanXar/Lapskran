@@ -11,8 +11,7 @@
 #include <map>
 #include <charconv>
 #include <algorithm>
-
-#pragma once
+#include <set>
 
 enum Reserved {
 	NOT_FOUND,
@@ -110,6 +109,8 @@ InternEntry id_table[1000] = {
 };
 
 
+#include "command.h"
+#include "importer.h"
 #include "interning.h"
 #include "properties.h"
 #include "token.h"
@@ -117,13 +118,56 @@ InternEntry id_table[1000] = {
 #include "orig.h"
 #include "lex.h"
 
+
+
 int main(int argc, char* argv[]) {
+
+
+	
+
+	if (argc < 2 or (argc == 2 and std::string(argv[1]) == "help")) {
+		print_help();
+		return 0;
+	}
+	else if (std::string(argv[1]) == "add_path") {
+		add_path();
+		return 0;
+	}
+	else if (std::string(argv[1]) == "build") {
+		if (argc < 3) {
+			std::cout << "error: build requires a file\n";
+			return 0;
+		}
+		goto build;
+	}
+	else {
+		print_help();
+		return 0;
+	}
+
+
+	build:
 
 	auto start = std::chrono::steady_clock::now();
 
-	std::string path = "C:\\Users\\admin\\Desktop\\lapskran\\Lapskran\\test.lps";
+	std::string path = argv[2];
+	std::string source = expand(path);   // ← вот здесь
+	/*
+	for (int i = 0; i < source.size(); i++) {
 
-	std::vector<std::string> words = gen_words_array(path);
+	std:: cout << source[i];
+
+	}*/
+
+
+
+
+	std::vector<std::string> words = gen_words_array(source);
+
+
+
+
+
 	std::vector<std::string> tokens = gen_tokens_array(words);
 
 	std::vector<uint32_t> ntokens = intern_all(tokens);

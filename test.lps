@@ -1,13 +1,147 @@
-1 2 3 4
-5 6 7 8
-9 10 11 12
-13 14 15 16
-0level lex <6 0u>
 
 
 
+fun main
+
+int a = 10
+
+return a
+end
+
+
+
+
+
+
+
+
+
+0level lex <word 0a>
+
+	pint 0cur = 0a
+	pstring 0tn = <0cur>
+	0cur += 1
+	pstring 1tn = <0cur>
+
+	pif 0tn == int
+
+		<0a> = TYPE
+		<0a>.name = 0tn
+		<0a>
+		pgoto close
+	pend
+
+	pif 0tn == if
+
+		<0a> = IF
+		<0a>
+		pgoto close
+	pend
+
+
+
+
+	pif 0tn == fun
+
+		<0a> = FUN
+		<0a>
+		pgoto close
+	pend
+
+	
+	pif 0tn == return
+
+		<0a> = RETURN
+		<0a>
+		pgoto close
+	pend
+
+
+
+
+	pif 0tn == end
+
+		<0a> = END
+		<0a>
+		pgoto close
+	pend
+
+
+	pif 0tn == ,
+
+		pnewline
+		
+		pgoto close
+	pend
+
+
+	
+	pif 0tn == =
+		pif 1tn == =
+
+			<0a> = EE
+			<0a>
+			0endm += 1
+			pgoto close
+
+		pend
+
+			<0a> = EQ
+			<0a>
+			pgoto close
+
+	pend
+
+	pif 0tn == <
+		pif 1tn == =
+
+			<0a> = LE
+			<0a>
+			0endm += 1
+			pgoto close
+
+		pend
+
+			<0a> = LT
+			<0a>
+			pgoto close
+
+	pend
+
+	pif 0tn == >
+		pif 1tn == =
+
+			<0a> = GE
+			<0a>
+			0endm += 1
+			pgoto close
+
+		pend
+
+			<0a> = GT
+			<0a>
+			pgoto close
+
+	pend
+
+	pif 0tn == !
+		pif 1tn == =
+
+			<0a> = NE
+			<0a>
+			0endm += 1
+			pgoto close
+
+		pend
+	pend
+
+	<0a> = INDENT
+	<0a>.name = 0tn
+	<0a>
+
+
+	plabel close
 pend
-
 
 
 

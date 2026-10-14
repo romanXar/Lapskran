@@ -38,5 +38,11 @@
     <ClInclude Include="Interning.h">
       <Filter>Файлы заголовков</Filter>
     </ClInclude>
+    <ClInclude Include="command.h">
+      <Filter>Файлы заголовков</Filter>
+    </ClInclude>
+    <ClInclude Include="importer.h">
+      <Filter>Файлы заголовков</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

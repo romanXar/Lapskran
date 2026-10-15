@@ -66,7 +66,7 @@ struct InternEntry {
 	int64_t num = 0;
 };
 
-InternEntry id_table[1000] = {
+std::vector<InternEntry> id_table = {
 	{ NOT_FOUND, "" },
 	{ PIF,       "pif" },
 	{ PWHILE,    "pwhile" },

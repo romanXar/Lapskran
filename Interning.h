@@ -27,7 +27,7 @@ uint32_t intern(const std::string& s) {
 		}
 	}
 
-	id_table[id] = { id, s, is_int, num };
+	id_table.push_back({ id, s, is_int, num });
 	str_to_id[s] = id;
 	id_to_str[id] = s;
 	return id;
@@ -40,6 +40,8 @@ std::vector<uint32_t> intern_all(const std::vector<std::string>& src) {
 			id_to_str[i] = id_table[i].text;
 		}
 	}
+
+
 	std::vector<uint32_t> out;
 	out.reserve(src.size());
 	for (int i = 0; i < (int)src.size(); i++) {

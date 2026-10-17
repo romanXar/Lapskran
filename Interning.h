@@ -27,7 +27,16 @@ uint32_t intern(const std::string& s) {
 		}
 	}
 
-	id_table.push_back({ id, s, is_int, num });
+	bool is_mv = false;
+	if (s.size() >= 2) {
+		unsigned char f = s[0];
+		unsigned char b = s.back();
+		if (f >= '0' && f <= '9' && ((b >= 'a' && b <= 'z') || (b >= 'A' && b <= 'Z'))) {
+			is_mv = true;
+		}
+	}
+
+	id_table.push_back({ id, s, is_int, num, is_mv });
 	str_to_id[s] = id;
 	id_to_str[id] = s;
 	return id;
@@ -66,4 +75,8 @@ inline bool is_int_sid(uint32_t id) {
 
 inline int64_t get_num(uint32_t id) {
 	return id_table[id].num;
+}
+
+inline bool is_macro_var_sid(uint32_t id) {
+	return id_table[id].is_macro_var;
 }

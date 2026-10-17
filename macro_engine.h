@@ -34,6 +34,12 @@ namespace mengine {
 	std::vector<Pattern> asm_pattern;
 	std::vector<Pattern>* pattern = nullptr;
 
+	enum PropKey {
+		PROP_IS_REF = 1,     // <0a>
+		PROP_IS_ARRAY,       // 0a[0i]
+		PROP_IS_PROP         // <0a>.ssss
+	};
+
 	void select_pattern(uint32_t name) {
 		if (name == LEX) pattern = &lex_pattern;
 		else if (name == AST) pattern = &ast_pattern;
@@ -61,11 +67,8 @@ namespace mengine {
 	}
 
 	std::vector<uint32_t> init(std::vector<uint32_t>& tk) {
-
 		std::vector<uint32_t> output_token;
-
 		int nested = -1;
-
 		bool is_cond = false;
 		bool is_body = false;
 
@@ -73,7 +76,9 @@ namespace mengine {
 			int      type = 0;
 			uint32_t lbl1 = 0;
 			uint32_t lbl2 = 0;
+			bool     has_else = false;
 		};
+
 		std::vector<BodyFrame> body_stack;
 
 		tk.push_back(0);
@@ -91,13 +96,10 @@ namespace mengine {
 				nested++;
 				body_stack.clear();
 			}
-
 			else if (tk[i] == PEND) { nested--; }
 
 			if (nested >= 0) {
-
 				if (is_cond) {
-
 					if ((tk[i] != LT) and (tk[i - 1] == LT) and tk[i] != OR) {
 						if (tk[i + 1] == GT) {
 							pattern->back().condition.push_back({});
@@ -123,39 +125,18 @@ namespace mengine {
 					}
 				}
 				else if (is_body) {
-
 					if (tk[i] == PIF) {
 						nested++;
 						BodyFrame f;
 						f.type = 1;
 						f.lbl1 = next_id++;
+						f.lbl2 = next_id++;
 						body_stack.push_back(f);
 
-						int cond_len;
-						if (tk[i + 3] == EQ) {
-							cond_len = 4;
-						}
-						else {
-							cond_len = 3;
-						}
-
+						int cond_len = (tk[i + 3] == EQ) ? 4 : 3;
 						uint32_t a_tok = tk[i + 1];
-
-						uint32_t op_tok;
-						if (cond_len == 4) {
-							op_tok = merge_op(tk[i + 2], tk[i + 3]);
-						}
-						else {
-							op_tok = tk[i + 2];
-						}
-
-						uint32_t b_tok;
-						if (cond_len == 4) {
-							b_tok = tk[i + 4];
-						}
-						else {
-							b_tok = tk[i + 3];
-						}
+						uint32_t op_tok = (cond_len == 4) ? merge_op(tk[i + 2], tk[i + 3]) : tk[i + 2];
+						uint32_t b_tok = (cond_len == 4) ? tk[i + 4] : tk[i + 3];
 
 						pattern->back().body.push_back({ 0, PIF });
 						pattern->back().body.push_back({ 0, a_tok });
@@ -163,8 +144,36 @@ namespace mengine {
 						pattern->back().body.push_back({ 0, b_tok });
 						pattern->back().body.push_back({ 0, ELSE });
 						pattern->back().body.push_back({ 0, f.lbl1 });
-
 						i += cond_len;
+					}
+					else if (tk[i] == PELIF) {
+						BodyFrame& f = body_stack.back();
+						pattern->back().body.push_back({ 0, PGOTO });
+						pattern->back().body.push_back({ 0, f.lbl2 });
+						pattern->back().body.push_back({ 0, PLABEL });
+						pattern->back().body.push_back({ 0, f.lbl1 });
+						f.lbl1 = next_id++;
+
+						int cond_len = (tk[i + 3] == EQ) ? 4 : 3;
+						uint32_t a_tok = tk[i + 1];
+						uint32_t op_tok = (cond_len == 4) ? merge_op(tk[i + 2], tk[i + 3]) : tk[i + 2];
+						uint32_t b_tok = (cond_len == 4) ? tk[i + 4] : tk[i + 3];
+
+						pattern->back().body.push_back({ 0, PIF });
+						pattern->back().body.push_back({ 0, a_tok });
+						pattern->back().body.push_back({ 0, op_tok });
+						pattern->back().body.push_back({ 0, b_tok });
+						pattern->back().body.push_back({ 0, ELSE });
+						pattern->back().body.push_back({ 0, f.lbl1 });
+						i += cond_len;
+					}
+					else if (tk[i] == PELSE) {
+						BodyFrame& f = body_stack.back();
+						f.has_else = true;
+						pattern->back().body.push_back({ 0, PGOTO });
+						pattern->back().body.push_back({ 0, f.lbl2 });
+						pattern->back().body.push_back({ 0, PLABEL });
+						pattern->back().body.push_back({ 0, f.lbl1 });
 					}
 					else if (tk[i] == PWHILE) {
 						nested++;
@@ -174,31 +183,10 @@ namespace mengine {
 						f.lbl2 = next_id++;
 						body_stack.push_back(f);
 
-						int cond_len;
-						if (tk[i + 3] == EQ) {
-							cond_len = 4;
-						}
-						else {
-							cond_len = 3;
-						}
-
+						int cond_len = (tk[i + 3] == EQ) ? 4 : 3;
 						uint32_t a_tok = tk[i + 1];
-
-						uint32_t op_tok;
-						if (cond_len == 4) {
-							op_tok = merge_op(tk[i + 2], tk[i + 3]);
-						}
-						else {
-							op_tok = tk[i + 2];
-						}
-
-						uint32_t b_tok;
-						if (cond_len == 4) {
-							b_tok = tk[i + 4];
-						}
-						else {
-							b_tok = tk[i + 3];
-						}
+						uint32_t op_tok = (cond_len == 4) ? merge_op(tk[i + 2], tk[i + 3]) : tk[i + 2];
+						uint32_t b_tok = (cond_len == 4) ? tk[i + 4] : tk[i + 3];
 
 						pattern->back().body.push_back({ 0, PLABEL });
 						pattern->back().body.push_back({ 0, f.lbl1 });
@@ -208,16 +196,20 @@ namespace mengine {
 						pattern->back().body.push_back({ 0, b_tok });
 						pattern->back().body.push_back({ 0, ELSE });
 						pattern->back().body.push_back({ 0, f.lbl2 });
-
 						i += cond_len;
 					}
 					else if (tk[i] == PEND and body_stack.size() > 1) {
 						BodyFrame f = body_stack.back();
 						body_stack.pop_back();
-
 						if (f.type == 1) {
+							if (!f.has_else) {
+								pattern->back().body.push_back({ 0, PGOTO });
+								pattern->back().body.push_back({ 0, f.lbl2 });
+								pattern->back().body.push_back({ 0, PLABEL });
+								pattern->back().body.push_back({ 0, f.lbl1 });
+							}
 							pattern->back().body.push_back({ 0, PLABEL });
-							pattern->back().body.push_back({ 0, f.lbl1 });
+							pattern->back().body.push_back({ 0, f.lbl2 });
 						}
 						else if (f.type == 2) {
 							pattern->back().body.push_back({ 0, PGOTO });
@@ -227,7 +219,52 @@ namespace mengine {
 						}
 					}
 					else if (tk[i] != NEWLINE) {
-						pattern->back().body.push_back({ 0, tk[i] });
+						// 1. <0a>.ssss
+						if (tk[i] == LT && is_macro_var_sid(tk[i + 1]) && tk[i + 2] == GT && tk[i + 3] == DOT) {
+							uint32_t uid = next_id++;
+							uint32_t var_name = tk[i + 1];
+							uint32_t prop_name = tk[i + 4];
+							props::set(var_name, uid, PROP_IS_PROP, prop_name);
+							pattern->back().body.push_back({ uid, var_name });
+							i += 4;
+						}
+						// 2. <0a>[0i]
+						else if (tk[i] == LT && is_macro_var_sid(tk[i + 1]) && tk[i + 2] == GT && tk[i + 3] == LBRACK && tk[i + 5] == RBRACK) {
+							uint32_t uid = next_id++;
+							uint32_t var_name = tk[i + 1];
+							uint32_t index_name = tk[i + 4];
+							props::set(var_name, uid, PROP_IS_ARRAY, index_name);
+							pattern->back().body.push_back({ uid, var_name });
+							i += 5;
+						}
+						// 3. <0a>
+						else if (tk[i] == LT && is_macro_var_sid(tk[i + 1]) && tk[i + 2] == GT) {
+							uint32_t uid = next_id++;
+							uint32_t var_name = tk[i + 1];
+							props::set(var_name, uid, PROP_IS_REF, 1);
+							pattern->back().body.push_back({ uid, var_name });
+							i += 2;
+						}
+						// 4. 0a[0i]
+						else if (is_macro_var_sid(tk[i]) && tk[i + 1] == LBRACK && tk[i + 3] == RBRACK) {
+							uint32_t uid = next_id++;
+							uint32_t var_name = tk[i];
+							uint32_t index_name = tk[i + 2];
+							props::set(var_name, uid, PROP_IS_ARRAY, index_name);
+							pattern->back().body.push_back({ uid, var_name });
+							i += 3;
+						}
+						// 5. <=, >=, ==, !=
+						else if ((tk[i] == LT || tk[i] == GT || tk[i] == EQ || tk[i] == BANG) && tk[i + 1] == EQ) {
+							uint32_t uid = next_id++;
+							uint32_t merged_op = merge_op(tk[i], tk[i + 1]);
+							pattern->back().body.push_back({ uid, merged_op });
+							i += 1;
+						}
+						// 6. Обычные токены
+						else {
+							pattern->back().body.push_back({ 0, tk[i] });
+						}
 					}
 				}
 
@@ -248,12 +285,10 @@ namespace mengine {
 					root.lbl2 = 0;
 					body_stack.push_back(root);
 				}
-
 			}
 			else if (nested == -1 and tk[i] == PEND) {
 				is_body = false;
 				is_cond = false;
-
 				for (int m = 0; m < 50; m++) {
 					pattern->back().body.push_back({ 0, 0 });
 				}
@@ -264,7 +299,6 @@ namespace mengine {
 			else if (nested == -1 and is_body == false and is_cond == false and tk[i] != 0) {
 				output_token.push_back(tk[i]);
 			}
-
 		}
 
 		std::stable_sort(lex_pattern.begin(), lex_pattern.end(), pattern_desc);
@@ -281,16 +315,11 @@ namespace mengine {
 	bool is_concurrence(const std::vector<btree::Token>& body, int& ii, int count, ...) {
 		va_list ap;
 		va_start(ap, count);
-
 		int start = ii;
 		int pos = ii;
-
 		for (int k = 0; k < count; k++) {
 			uint32_t pat = va_arg(ap, uint32_t);
-			if (pat == ANY) {
-				pos++;
-				continue;
-			}
+			if (pat == ANY) { pos++; continue; }
 			if (body[pos].name != pat) {
 				va_end(ap);
 				ii = start;
@@ -298,514 +327,375 @@ namespace mengine {
 			}
 			pos++;
 		}
-
 		va_end(ap);
 		resize_ii = pos - start;
 		return true;
 	}
 
-	inline bool is_macro_var(const std::string& s) {
-		if (s.size() < 2) return false;
-		unsigned char f = s[0];
-		unsigned char b = s.back();
-		return f >= '0' && f <= '9' && ((b >= 'a' && b <= 'z') || (b >= 'A' && b <= 'Z'));
-	}
-
 	struct Macro_var {
 		int64_t value = 0;
-		std::string type = "";
+		std::string type = "";        // "pint", "pstring", "array"
 		std::string str_value = "";
+		std::vector<uint32_t> array;  // Данные массива (интернированные ID)
+
+		// Для жесткой синхронизации
+		uint32_t size_var_id = 0;     // Для массива (ID переменной размера, например 0f)
+		uint32_t linked_array_id = 0; // Для переменной размера (ID массива, например 0a)
 	};
 
-	namespace lex {
-
-		void goto_label(const std::vector<btree::Token>& body, int& ii) {
-			uint32_t jump_label = body[ii].name;
-
-			for (ii = 0; ii < body.size() - 50; ii++) {
-				if (body[ii].name == PLABEL and body[ii + 1].name == jump_label) {
-					ii += 2;
-					break;
-				}
+	void goto_label(const std::vector<btree::Token>& body, int& ii) {
+		uint32_t jump_label = body[ii].name;
+		for (ii = 0; ii < body.size() - 50; ii++) {
+			if (body[ii].name == PLABEL and body[ii + 1].name == jump_label) {
+				ii += 2;
+				break;
 			}
 		}
-
-		void match(int i_pattern) {
-			std::unordered_map<uint32_t, Macro_var> macro_vars;
-
-			for (int i = 0; i < btree::get_length(); i++) {
-
-				int start_replace = i;
-				int csize = lex_pattern[i_pattern].condition.size();
-
-				bool result_match = true;
-				int ci = 0;
-
-				while (ci < csize) {
-					uint32_t type_command = lex_pattern[i_pattern].condition[ci].command_type;
-
-					if (type_command == CMD_TOKWN or type_command == CMD_TOK) {
-						uint32_t input_token = btree::get(i).name;
-						uint32_t token_name = lex_pattern[i_pattern].condition[ci].comand[0];
-						if (type_command == CMD_TOK) {
-
-							uint32_t id_tok = lex_pattern[i_pattern].condition[ci].comand[1];
-
-							macro_vars[id_tok].value = i;
-							macro_vars[id_tok].type = "pint";
-						}
-
-						if (token_name == input_token or token_name == TOKEN or (token_name == wORD and input_token != NEWLINE)) {
-							result_match = true;
-							i++;
-						}
-						else {
-							result_match = false;
-						}
-						ci++;
-					}
-					else if (type_command == CMD_AND) {
-						if (!result_match) {
-							ci = csize;
-						}
-						else {
-							ci++;
-						}
-					}
-					else if (type_command == CMD_OR) {
-						if (result_match) {
-							int k = ci + 1;
-							while (k < csize) {
-								uint32_t t = lex_pattern[i_pattern].condition[k].command_type;
-								if (t == CMD_AND or t == CMD_END_COND) break;
-								k++;
-							}
-							ci = k;
-						}
-						else {
-							ci++;
-						}
-					}
-					else {
-						ci++;
-					}
-				}
-
-				if (result_match and i > start_replace) {
-
-					btree::create_tree("buffer");
-					btree::use("buffer");
-
-
-					intern("0startm");
-					intern("0endm");
-
-					macro_vars[get_id("0startm")].type = "pint";
-					macro_vars[get_id("0startm")].value = start_replace;
-
-					macro_vars[get_id("0endm")].type = "pint";
-					macro_vars[get_id("0endm")].value = i;
-
-					std::vector<btree::Token>& body = lex_pattern[i_pattern].body;
-
-					for (int ii = 0; ii < body.size() - 50; ) {
-
-						if (body[ii].name == PNEWLINE) { btree::push_back({ btree::gen_id(), NEWLINE }); ii++; }
-						//<123>.asd = afefef
-						//<123>.asd = 0a
-						else if (is_concurrence(body, ii, 7, LT, ANY, GT, DOT, ANY, EQ, ANY)) {
-
-							uint32_t slot = body[ii + 1].name;
-
-							if (macro_vars.contains(slot)) {
-
-								btree::use("main");
-								btree::Token t = btree::get((int)macro_vars[slot].value);
-								btree::use("buffer");
-
-								uint32_t val;
-
-								if (macro_vars.contains(body[ii + 6].name)) {
-									auto& mv = macro_vars[body[ii + 6].name];
-									if (mv.type == "pstring") {
-										val = intern(mv.str_value);
-									}
-									else if (mv.type == "pint") {
-										val = intern(std::to_string(mv.value));
-									}
-									else {
-										std::cout << "macro bastard: property rhs var '" << get_str(body[ii + 6].name) << "' has unknown type '" << mv.type << "'" << std::endl;
-										exit(-1);
-									}
-								}
-								else {
-									val = body[ii + 6].name;
-								}
-
-								props::set(t.name, t.id, body[ii + 4].name, val);
-							}
-
-							ii += resize_ii;
-						}
-						// <0> = 0k   pstring
-						// <0> = ssrdhdgh   
-						else if (is_concurrence(body, ii, 5, LT, ANY, GT, EQ, ANY) && macro_vars.contains(body[ii + 1].name))
-						{
-							uint32_t slot = body[ii + 1].name;
-
-							if (macro_vars.contains(body[ii + 4].name)) {
-								auto& mv = macro_vars[body[ii + 4].name];
-								if (mv.type != "pstring") {
-									std::cout << "macro bastard: rename requires pstring, got '" << mv.type << "'" << std::endl;
-									exit(-1);
-								}
-
-								btree::use("main");
-								btree::Token& t = btree::get((int)macro_vars[slot].value);
-								t.name = intern(mv.str_value);
-								btree::use("buffer");
-							}
-							else {
-								btree::use("main");
-
-								btree::Token& t = btree::get((int)macro_vars[slot].value);
-								t.name = body[ii + 4].name;
-
-								btree::use("buffer");
-							}
-							ii += resize_ii;
-						}
-						//<123>.asd
-						else if (is_concurrence(body, ii, 5, LT, ANY, GT, DOT, ANY)) {
-							uint32_t slot = body[ii + 1].name;
-
-							if (macro_vars.contains(slot)) {
-
-								btree::use("main");
-								btree::Token t = btree::get((int)macro_vars[slot].value);
-								btree::use("buffer");
-
-								uint32_t val = props::get(t.name, t.id, body[ii + 4].name);
-								if (val == NOT_FOUND) {
-									std::cout << "macro bastard: property '" << get_str(body[ii + 4].name) << "' not found on token <" << get_str(slot) << ">" << std::endl;
-									exit(-1);
-								}
-								btree::push_back({ btree::gen_id(), val });
-							}
-							ii += resize_ii;
-						}
-
-						//<123>
-						else if (is_concurrence(body, ii, 3, LT, ANY, GT) and macro_vars.contains(body[ii + 1].name)) {
-							btree::use("main");
-							btree::Token t = btree::get((int)macro_vars[body[ii + 1].name].value);
-							btree::use("buffer");
-
-							btree::push_back(t);
-							ii += resize_ii;
-						}
-						// pstring 0a
-						// pstring 0a = <0>
-						else if (body[ii].name == pSTRING) {
-							if (!is_macro_var(get_str(body[ii + 1].name))) {
-								std::cout << "macro bastard: 'pstring' expects var name, got '" << get_str(body[ii + 1].name) << "'" << std::endl;
-								exit(-1);
-							}
-
-							if (macro_vars.contains(body[ii + 1].name) and macro_vars[body[ii + 1].name].type != "" and macro_vars[body[ii + 1].name].type != "pstring") {
-								std::cout << "macro bastard: var '" << get_str(body[ii + 1].name) << "' already declared as '" << macro_vars[body[ii + 1].name].type << "'" << std::endl;
-								exit(-1);
-							}
-
-							macro_vars[body[ii + 1].name].type = "pstring";
-
-							if (body[ii + 2].name == EQ or body[ii + 2].name == PLUS or body[ii + 2].name == MINUS) {
-								ii += 1;
-							}
-							else {
-								ii += 2;
-							}
-						}
-						// pint 0a
-						// pint 0a = 10
-						else if (body[ii].name == pINT) {
-							if (!is_macro_var(get_str(body[ii + 1].name))) {
-								std::cout << "macro bastard: 'pint' expects var name, got '" << get_str(body[ii + 1].name) << "'" << std::endl;
-								exit(-1);
-							}
-
-							if (macro_vars.contains(body[ii + 1].name) and macro_vars[body[ii + 1].name].type != "" and macro_vars[body[ii + 1].name].type != "pint") {
-								std::cout << "macro bastard: var '" << get_str(body[ii + 1].name) << "' already declared as '" << macro_vars[body[ii + 1].name].type << "'" << std::endl;
-								exit(-1);
-							}
-
-							macro_vars[body[ii + 1].name].type = "pint";
-
-							if (body[ii + 2].name == EQ or body[ii + 2].name == PLUS or body[ii + 2].name == MINUS) {
-								ii += 1;
-							}
-							else {
-								ii += 2;
-							}
-						}
-
-						//0a = ...
-						else if (is_macro_var(get_str(body[ii].name))) {
-							if (is_concurrence(body, ii, 7, ANY, EQ, LT, ANY, GT, DOT, ANY)) {
-
-								if (!macro_vars.contains(body[ii].name)) {
-									std::cout << "macro bastard: macro var '" << get_str(body[ii].name) << "' not found" << std::endl;
-									exit(-1);
-								}
-
-								if (macro_vars[body[ii].name].type != "pint") {
-									std::cout << "macro bastard: macro var '" << get_str(body[ii].name) << "' is not pint" << std::endl;
-									exit(-1);
-								}
-
-								uint32_t slot = body[ii + 3].name;
-								if (!macro_vars.contains(slot)) {
-									std::cout << "macro bastard: capture '" << get_str(slot) << "' not found" << std::endl;
-									exit(-1);
-								}
-
-								btree::use("main");
-								btree::Token t = btree::get((int)macro_vars[slot].value);
-								btree::use("buffer");
-
-								uint32_t val = props::get(t.name, t.id, body[ii + 6].name);
-								if (val == NOT_FOUND) {
-									std::cout << "macro bastard: property '" << get_str(body[ii + 6].name) << "' not found on token <" << get_str(slot) << ">" << std::endl;
-									exit(-1);
-								}
-
-								if (!is_int_sid(val)) {
-									std::cout << "macro bastard: property '" << get_str(body[ii + 6].name) << "' on token <" << get_str(slot) << "> is not integer (value='" << get_str(val) << "')" << std::endl;
-									exit(-1);
-								}
-
-								macro_vars[body[ii].name].value = get_num(val);
-								ii += resize_ii;
-							}
-							else if (is_concurrence(body, ii, 5, ANY, EQ, LT, ANY, GT)) {
-
-								if (!macro_vars.contains(body[ii].name)) {
-									std::cout << "macro bastard: macro var '" << get_str(body[ii].name) << "' not found" << std::endl;
-									exit(-1);
-								}
-
-								uint32_t slot = body[ii + 3].name;
-								if (!macro_vars.contains(slot)) {
-									std::cout << "macro bastard: capture '" << get_str(slot) << "' not found" << std::endl;
-									exit(-1);
-								}
-
-								btree::use("main");
-								btree::Token t = btree::get((int)macro_vars[slot].value);
-								btree::use("buffer");
-
-								const std::string& src = get_str(t.name);
-
-								if (macro_vars[body[ii].name].type == "pint") {
-									if (!is_int_sid(t.name)) {
-										std::cout << "macro bastard: macro var '" << get_str(body[ii].name) << "' is pint, but loaded token '" << src << "' (captured as <" << get_str(slot) << ">) is not integer" << std::endl;
-										exit(-1);
-									}
-									macro_vars[body[ii].name].value = get_num(t.name);
-								}
-								else if (macro_vars[body[ii].name].type == "pstring") {
-									macro_vars[body[ii].name].str_value = src;
-								}
-								else {
-									std::cout << "macro bastard: macro var '" << get_str(body[ii].name) << "' has unknown type '" << macro_vars[body[ii].name].type << "'" << std::endl;
-									exit(-1);
-								}
-
-								ii += resize_ii;
-							}
-							else if (is_concurrence(body, ii, 3, ANY, EQ, ANY)) {
-								if (!macro_vars.contains(body[ii].name)) {
-									std::cout << "macro bastard: macro var '" << get_str(body[ii].name) << "' not found" << std::endl;
-									exit(-1);
-								}
-
-								auto& dst = macro_vars[body[ii].name];
-								uint32_t rhs = body[ii + 2].name;
-
-								if (dst.type == "pint") {
-									if (is_macro_var(get_str(rhs))) {
-										if (!macro_vars.contains(rhs)) {
-											std::cout << "macro bastard: macro var '" << get_str(rhs) << "' not found" << std::endl;
-											exit(-1);
-										}
-										if (macro_vars[rhs].type != "pint") {
-											std::cout << "macro bastard: macro var '" << get_str(rhs) << "' is not pint (type='" << macro_vars[rhs].type << "')" << std::endl;
-											exit(-1);
-										}
-										dst.value = macro_vars[rhs].value;
-										ii += resize_ii;
-									}
-									else if (is_int_sid(rhs)) {
-										dst.value = get_num(rhs);
-										ii += resize_ii;
-									}
-									else {
-										std::cout << "macro bastard: macro var or token '" << get_str(rhs) << "' not int" << std::endl;
-										exit(-1);
-									}
-								}
-								else if (dst.type == "pstring") {
-									if (is_macro_var(get_str(rhs))) {
-										if (!macro_vars.contains(rhs)) {
-											std::cout << "macro bastard: macro var '" << get_str(rhs) << "' not found" << std::endl;
-											exit(-1);
-										}
-										if (macro_vars[rhs].type != "pstring") {
-											std::cout << "macro bastard: macro var '" << get_str(rhs) << "' is not pstring (type='" << macro_vars[rhs].type << "')" << std::endl;
-											exit(-1);
-										}
-										dst.str_value = macro_vars[rhs].str_value;
-										ii += resize_ii;
-									}
-									else {
-										dst.str_value = get_str(rhs);
-										ii += resize_ii;
-									}
-								}
-								else {
-									std::cout << "macro bastard: macro var '" << get_str(body[ii].name) << "' has unknown type '" << dst.type << "'" << std::endl;
-									exit(-1);
-								}
-							}
-							else if (is_concurrence(body, ii, 4, ANY, PLUS, EQ, ANY)) {
-								if (!macro_vars.contains(body[ii].name)) {
-									std::cout << "macro bastard: macro var '" << get_str(body[ii].name) << "' not found" << std::endl;
-									exit(-1);
-								}
-								if (macro_vars[body[ii].name].type != "pint") {
-									std::cout << "macro bastard: macro var '" << get_str(body[ii].name) << "' is not pint (type='" << macro_vars[body[ii].name].type << "')" << std::endl;
-									exit(-1);
-								}
-								if (!is_int_sid(body[ii + 3].name)) {
-									std::cout << "macro bastard: token '" << get_str(body[ii + 3].name) << "' not int" << std::endl;
-									exit(-1);
-								}
-								macro_vars[body[ii].name].value += get_num(body[ii + 3].name);
-								ii += resize_ii;
-							}
-							else if (is_concurrence(body, ii, 4, ANY, MINUS, EQ, ANY)) {
-								if (!macro_vars.contains(body[ii].name)) {
-									std::cout << "macro bastard: macro var '" << get_str(body[ii].name) << "' not found" << std::endl;
-									exit(-1);
-								}
-								if (macro_vars[body[ii].name].type != "pint") {
-									std::cout << "macro bastard: macro var '" << get_str(body[ii].name) << "' is not pint (type='" << macro_vars[body[ii].name].type << "')" << std::endl;
-									exit(-1);
-								}
-								if (!is_int_sid(body[ii + 3].name)) {
-									std::cout << "macro bastard: token '" << get_str(body[ii + 3].name) << "' not int" << std::endl;
-									exit(-1);
-								}
-								macro_vars[body[ii].name].value -= get_num(body[ii + 3].name);
-								ii += resize_ii;
-							}
-							else {
-								if (!macro_vars.contains(body[ii].name)) {
-									std::cout << "macro bastard: macro var '" << get_str(body[ii].name) << "' not found" << std::endl;
-									exit(-1);
-								}
-								if (macro_vars[body[ii].name].type == "pint") {
-									btree::push_back({ btree::gen_id(), intern(std::to_string(macro_vars[body[ii].name].value)) });
-
-								}
-								else if (macro_vars[body[ii].name].type == "pstring") {
-									btree::push_back({ btree::gen_id(), intern(macro_vars[body[ii].name].str_value) });
-
-								}
-								ii++;
-							}
-						}
-						//
-						else if (body[ii].name == PIF) {
-
-							if (is_concurrence(body, ii, 6, PIF, ANY, ANY, ANY, ELSE, ANY)) {
-
-								int64_t a = 0, b = 0;
-								bool a_is_int = false, b_is_int = false;
-								std::string a_str, b_str;
-
-								if (is_int_sid(body[ii + 1].name)) { a = get_num(body[ii + 1].name); a_is_int = true; a_str = get_str(body[ii + 1].name); }
-								else if (macro_vars.contains(body[ii + 1].name) and macro_vars[body[ii + 1].name].type == "pint") { a = macro_vars[body[ii + 1].name].value; a_is_int = true; a_str = std::to_string(a); }
-								else if (macro_vars.contains(body[ii + 1].name) and macro_vars[body[ii + 1].name].type == "pstring") { a_str = macro_vars[body[ii + 1].name].str_value; }
-								else { a_str = get_str(body[ii + 1].name); }
-
-								if (is_int_sid(body[ii + 3].name)) { b = get_num(body[ii + 3].name); b_is_int = true; b_str = get_str(body[ii + 3].name); }
-								else if (macro_vars.contains(body[ii + 3].name) and macro_vars[body[ii + 3].name].type == "pint") { b = macro_vars[body[ii + 3].name].value; b_is_int = true; b_str = std::to_string(b); }
-								else if (macro_vars.contains(body[ii + 3].name) and macro_vars[body[ii + 3].name].type == "pstring") { b_str = macro_vars[body[ii + 3].name].str_value; }
-								else { b_str = get_str(body[ii + 3].name); }
-
-								bool only_int = a_is_int and b_is_int;
-								uint32_t op = body[ii + 2].name;
-								bool result = false;
-
-								if (only_int) {
-									if (op == EQ_EQ) { if (a == b) result = true; }
-									else if (op == BANG_EQ) { if (a != b) result = true; }
-									else if (op == LT_EQ) { if (a <= b) result = true; }
-									else if (op == GT_EQ) { if (a >= b) result = true; }
-									else if (op == LT) { if (a < b) result = true; }
-									else if (op == GT) { if (a > b) result = true; }
-								}
-								else {
-									if (op == LT or op == GT or op == LT_EQ or op == GT_EQ) {
-										std::cout << "macro bastard: cannot compare strings with '<', '>', '<=' or '>=' ('" << a_str << "' " << get_str(op) << " '" << b_str << "')" << std::endl;
-										exit(-1);
-									}
-									else if (op == BANG_EQ) { if (a_str != b_str) result = true; }
-									else if (op == EQ_EQ) { if (a_str == b_str) result = true; }
-								}
-
-								if (result) {
-									ii += 6;
-								}
-								else {
-									goto_label(body, ii += 5);
-								}
-							}
-						}
-
-						else if (body[ii].name == PLABEL) {
-							ii += 2;
-						}
-						else if (body[ii].name == PGOTO) {
-							goto_label(body, ii += 1);
-						}
-						else {
-							if (body[ii].name != 0) {
-								push_back(body[ii]);
-								ii++;
-							}
-						}
-
-					}
-
-					 start_replace = macro_vars[get_id("0startm")].value;
-
-					 i = macro_vars[get_id("0endm")].value;
-
-
-					btree::move_in("main", start_replace, i);
-					btree::use("main");
-					i += btree::get_resize() - 1;
-
-				}
-				else {
-					i = start_replace;
-				}
-
-			}
-		}
-
 	}
 
+	std::string get_macro_val(const btree::Token& tok, std::unordered_map<uint32_t, Macro_var>& macro_vars) {
+		if (props::get(tok.name, tok.id, PROP_IS_REF) != NOT_FOUND) {
+			btree::use("main");
+			int pos = (int)macro_vars[tok.name].value;
+			std::string res = get_str(btree::get(pos).name);
+			btree::use("buffer");
+			return res;
+		}
+
+		uint32_t idx_var = props::get(tok.name, tok.id, PROP_IS_ARRAY);
+		if (idx_var != NOT_FOUND) {
+			int i = is_int_sid(idx_var) ? (int)get_num(idx_var) : (int)macro_vars[idx_var].value;
+			if (i < macro_vars[tok.name].array.size()) {
+				return get_str(macro_vars[tok.name].array[i]);
+			}
+			return "0";
+		}
+
+		uint32_t prop_name = props::get(tok.name, tok.id, PROP_IS_PROP);
+		if (prop_name != NOT_FOUND) {
+			btree::use("main");
+			int pos = (int)macro_vars[tok.name].value;
+			btree::Token main_tok = btree::get(pos);
+			btree::use("buffer");
+
+			uint32_t prop_val = props::get(main_tok.name, main_tok.id, prop_name);
+			if (prop_val != NOT_FOUND) {
+				return get_str(prop_val);
+			}
+			return "";
+		}
+
+		if (macro_vars[tok.name].type == "pint") return std::to_string(macro_vars[tok.name].value);
+		if (macro_vars[tok.name].type == "pstring") return macro_vars[tok.name].str_value;
+		return "";
+	}
+
+	void set_macro_val(const btree::Token& tok, const std::string& val, std::unordered_map<uint32_t, Macro_var>& macro_vars) {
+		if (props::get(tok.name, tok.id, PROP_IS_REF) != NOT_FOUND) {
+			btree::use("main");
+			int pos = (int)macro_vars[tok.name].value;
+			btree::get(pos).name = intern(val);
+			btree::use("buffer");
+			return;
+		}
+
+		uint32_t idx_var = props::get(tok.name, tok.id, PROP_IS_ARRAY);
+		if (idx_var != NOT_FOUND) {
+			int i = is_int_sid(idx_var) ? (int)get_num(idx_var) : (int)macro_vars[idx_var].value;
+			if (i >= macro_vars[tok.name].array.size()) {
+				macro_vars[tok.name].array.resize(i + 1, intern("0"));
+			}
+			macro_vars[tok.name].array[i] = intern(val);
+			uint32_t size_var = macro_vars[tok.name].size_var_id;
+			if (size_var != 0) {
+				macro_vars[size_var].value = macro_vars[tok.name].array.size();
+			}
+			return;
+		}
+
+		uint32_t prop_name = props::get(tok.name, tok.id, PROP_IS_PROP);
+		if (prop_name != NOT_FOUND) {
+			btree::use("main");
+			int pos = (int)macro_vars[tok.name].value;
+			btree::Token main_tok = btree::get(pos);
+			props::set(main_tok.name, main_tok.id, prop_name, intern(val));
+			btree::use("buffer");
+			return;
+		}
+
+		uint32_t linked_arr = macro_vars[tok.name].linked_array_id;
+		if (linked_arr != 0) {
+			macro_vars[tok.name].value = std::stoll(val);
+			macro_vars[linked_arr].array.resize(macro_vars[tok.name].value, intern("0"));
+			return;
+		}
+
+		bool is_num = false;
+		int64_t num = 0;
+		if (!val.empty()) {
+			auto [ptr, ec] = std::from_chars(val.data(), val.data() + val.size(), num);
+			if (ec == std::errc() && ptr == val.data() + val.size()) {
+				is_num = true;
+			}
+		}
+
+		if (is_num) {
+			macro_vars[tok.name].type = "pint";
+			macro_vars[tok.name].value = num;
+		}
+		else {
+			macro_vars[tok.name].type = "pstring";
+			macro_vars[tok.name].str_value = val;
+		}
+	}
+
+	void match(int i_pattern) {
+		std::unordered_map<uint32_t, Macro_var> macro_vars;
+		// Псевдокод внутри match:
+		macro_vars[get_id("0eof")].type = "pint";
+		macro_vars[get_id("0eof")].value = btree::get_length(); // Размер всего дерева
+		for (int i = 0; i < btree::get_length(); i++) {
+			int start_replace = i;
+			int csize = lex_pattern[i_pattern].condition.size();
+			bool result_match = true;
+			int ci = 0;
+
+			while (ci < csize) {
+				uint32_t type_command = lex_pattern[i_pattern].condition[ci].command_type;
+				if (type_command == CMD_TOKWN or type_command == CMD_TOK) {
+					uint32_t input_token = btree::get(i).name;
+					uint32_t token_name = lex_pattern[i_pattern].condition[ci].comand[0];
+					if (type_command == CMD_TOK) {
+						uint32_t id_tok = lex_pattern[i_pattern].condition[ci].comand[1];
+						macro_vars[id_tok].value = i;
+						macro_vars[id_tok].type = "pint";
+					}
+					if (token_name == input_token or token_name == TOKEN or (token_name == wORD and input_token != NEWLINE)) {
+						result_match = true;
+						i++;
+					}
+					else {
+						result_match = false;
+					}
+					ci++;
+				}
+				else if (type_command == CMD_AND) {
+					if (!result_match) { ci = csize; }
+					else { ci++; }
+				}
+				else if (type_command == CMD_OR) {
+					if (result_match) {
+						int k = ci + 1;
+						while (k < csize) {
+							uint32_t t = lex_pattern[i_pattern].condition[k].command_type;
+							if (t == CMD_AND or t == CMD_END_COND) break;
+							k++;
+						}
+						ci = k;
+					}
+					else { ci++; }
+				}
+				else { ci++; }
+			}
+
+			if (result_match and i > start_replace) {
+
+				intern("0eof");
+
+
+				macro_vars[get_id("0eof")].type = "pint";
+				macro_vars[get_id("0eof")].value = btree::get_length(); // Размер всего дерева
+
+				btree::create_tree("buffer");
+				btree::use("buffer");
+
+				intern("0startm");
+				intern("0endm");
+
+
+
+
+
+				macro_vars[get_id("0startm")].type = "pint";
+				macro_vars[get_id("0startm")].value = start_replace;
+
+				macro_vars[get_id("0endm")].type = "pint";
+				macro_vars[get_id("0endm")].value = i;
+
+				std::vector<btree::Token>& body = lex_pattern[i_pattern].body;
+
+				for (int ii = 0; ii < body.size() - 50; ) {
+
+					if (is_concurrence(body, ii, 1, PNEWLINE)) {
+						btree::push_back({ btree::gen_id(), NEWLINE });
+						ii += resize_ii;
+					}
+
+					else if (is_macro_var_sid(body[ii].name)) {
+
+						// 1. ПРИСВАИВАНИЕ (0a = ...)
+						if (is_concurrence(body, ii, 3, ANY, EQ, ANY)) {
+							btree::Token left_var = body[ii];
+							btree::Token right_tok = body[ii + 2];
+
+							std::string right_var = "";
+							if (is_macro_var_sid(right_tok.name)) {
+								right_var = get_macro_val(right_tok, macro_vars);
+							}
+							else {
+								right_var = get_str(right_tok.name);
+							}
+
+							set_macro_val(left_var, right_var, macro_vars);
+							ii += resize_ii;
+						}
+
+						// СЛОЖЕНИЕ И ВЫЧИТАНИЕ (0a += ... ИЛИ 0a -= ...)
+						else if (is_concurrence(body, ii, 4, ANY, PLUS, EQ, ANY) || is_concurrence(body, ii, 4, ANY, MINUS, EQ, ANY)) {
+							btree::Token left_var = body[ii];
+							uint32_t op_type = body[ii + 1].name;
+							btree::Token right_tok = body[ii + 3];
+
+							std::string left_val = get_macro_val(left_var, macro_vars);
+							std::string right_val = is_macro_var_sid(right_tok.name) ? get_macro_val(right_tok, macro_vars) : get_str(right_tok.name);
+
+							bool l_is_num = false, r_is_num = false;
+							int64_t l_num = 0, r_num = 0;
+
+							if (!left_val.empty()) {
+								auto [ptr, ec] = std::from_chars(left_val.data(), left_val.data() + left_val.size(), l_num);
+								if (ec == std::errc() && ptr == left_val.data() + left_val.size()) l_is_num = true;
+							}
+							if (!right_val.empty()) {
+								auto [ptr, ec] = std::from_chars(right_val.data(), right_val.data() + right_val.size(), r_num);
+								if (ec == std::errc() && ptr == right_val.data() + right_val.size()) r_is_num = true;
+							}
+
+							if (l_is_num && r_is_num) {
+								if (op_type == PLUS) set_macro_val(left_var, std::to_string(l_num + r_num), macro_vars);
+								else set_macro_val(left_var, std::to_string(l_num - r_num), macro_vars);
+							}
+							else if (op_type == PLUS) {
+								set_macro_val(left_var, left_val + right_val, macro_vars);
+							}
+
+							ii += resize_ii;
+						}
+
+						// 3. ОБЪЯВЛЕНИЕ ИЛИ ЧТЕНИЕ (0a, 0a[0f], 0a[40])
+						else if (is_concurrence(body, ii, 1, ANY)) {
+							btree::Token tok = body[ii];
+							uint32_t idx_var = props::get(tok.name, tok.id, PROP_IS_ARRAY);
+
+							if (idx_var != NOT_FOUND) {
+								if (!is_int_sid(idx_var) && macro_vars[tok.name].type != "array") {
+									macro_vars[tok.name].type = "array";
+									macro_vars[tok.name].size_var_id = idx_var;
+
+									macro_vars[idx_var].type = "pint";
+									macro_vars[idx_var].value = 0;
+									macro_vars[idx_var].linked_array_id = tok.name;
+								}
+								else {
+									std::string val = get_macro_val(tok, macro_vars);
+									btree::push_back({ btree::gen_id(), intern(val) });
+								}
+								ii += resize_ii;
+							}
+							else {
+								// НЕ МАССИВ. Проверяем, это ссылка <0a> или обычная переменная
+								if (props::get(tok.name, tok.id, PROP_IS_REF) != NOT_FOUND) {
+									// <0a> - берем ОРИГИНАЛЬНЫЙ ТОКЕН из main, чтобы сохранить его ID и СВОЙСТВА
+									btree::use("main");
+									int pos = (int)macro_vars[tok.name].value;
+									btree::Token main_tok = btree::get(pos);
+									btree::use("buffer");
+									btree::push_back(main_tok);
+								}
+								else {
+									// Обычная переменная - достаем строку и создаем новый токен
+									std::string val = get_macro_val(tok, macro_vars);
+
+									// ИСПРАВЛЕНИЕ: Не пушим пустые токены!
+									if (!val.empty()) {
+										btree::push_back({ btree::gen_id(), intern(val) });
+									}
+								}
+								ii += resize_ii;
+							}
+						}
+						else {
+							ii++;
+						}
+					}
+
+
+					// ОБРАБОТКА PIF
+					else if (is_concurrence(body, ii, 6, PIF, ANY, ANY, ANY, ELSE, ANY)) {
+						btree::Token left_tok = body[ii + 1];
+						uint32_t op = body[ii + 2].name;
+						btree::Token right_tok = body[ii + 3];
+
+						std::string left_val = is_macro_var_sid(left_tok.name) ? get_macro_val(left_tok, macro_vars) : get_str(left_tok.name);
+						std::string right_val = is_macro_var_sid(right_tok.name) ? get_macro_val(right_tok, macro_vars) : get_str(right_tok.name);
+
+						bool result = false;
+						bool l_is_num = false, r_is_num = false;
+						int64_t l_num = 0, r_num = 0;
+						if (!left_val.empty()) {
+							auto [ptr, ec] = std::from_chars(left_val.data(), left_val.data() + left_val.size(), l_num);
+							if (ec == std::errc() && ptr == left_val.data() + left_val.size()) l_is_num = true;
+						}
+						if (!right_val.empty()) {
+							auto [ptr, ec] = std::from_chars(right_val.data(), right_val.data() + right_val.size(), r_num);
+							if (ec == std::errc() && ptr == right_val.data() + right_val.size()) r_is_num = true;
+						}
+
+						if (l_is_num && r_is_num) {
+							if (op == EQ_EQ) result = (l_num == r_num);
+							else if (op == BANG_EQ) result = (l_num != r_num);
+							else if (op == LT) result = (l_num < r_num);
+							else if (op == GT) result = (l_num > r_num);
+							else if (op == LT_EQ) result = (l_num <= r_num);
+							else if (op == GT_EQ) result = (l_num >= r_num);
+						}
+						else {
+							if (op == EQ_EQ) result = (left_val == right_val);
+							else if (op == BANG_EQ) result = (left_val != right_val);
+						}
+
+						if (result) {
+							ii += 6;
+						}
+						else {
+							goto_label(body, ii += 5);
+						}
+					}
+
+
+					else if (is_concurrence(body, ii, 2, PLABEL, ANY)) {
+						ii += resize_ii;
+					}
+					else if (is_concurrence(body, ii, 2, PGOTO, ANY)) {
+						goto_label(body, ii += 1);
+					}
+
+					else {
+						btree::push_back(body[ii]);
+						ii++;
+					}
+				}
+
+				start_replace = macro_vars[get_id("0startm")].value;
+				i = macro_vars[get_id("0endm")].value;
+
+				btree::move_in("main", start_replace, i);
+				btree::use("main");
+				i += btree::get_resize() - 1;
+			}
+			else {
+				i = start_replace;
+			}
+		}
+	}
 }

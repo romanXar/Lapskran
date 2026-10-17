@@ -16,6 +16,8 @@
 enum Reserved {
 	NOT_FOUND,
 	PIF,
+	PELIF,
+	PELSE,
 	PWHILE,
 	pINT,
 	pSTRING,
@@ -64,11 +66,14 @@ struct InternEntry {
 	std::string text;
 	bool is_int = false;
 	int64_t num = 0;
+	bool is_macro_var = false; 
 };
 
 std::vector<InternEntry> id_table = {
 	{ NOT_FOUND, "" },
 	{ PIF,       "pif" },
+	{ PELIF,       "pelif" },
+	{ PELSE,       "pelse" },
 	{ PWHILE,    "pwhile" },
 	{ pINT,      "pint" },
 	{ pSTRING,   "pstring" },
@@ -186,7 +191,7 @@ int main(int argc, char* argv[]) {
 	tokens.shrink_to_fit();
 
 	for (int i = 0; i < (int)mengine::lex_pattern.size(); i++) {
-		mengine::lex::match(i);
+		mengine::match(i);
 	}
 
 	auto end = std::chrono::steady_clock::now();

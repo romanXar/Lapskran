@@ -12,106 +12,7 @@
 #include <charconv>
 #include <algorithm>
 #include <set>
-
-enum Reserved {
-	NOT_FOUND,
-	PIF,
-	PELIF,
-	PELSE,
-	PWHILE,
-	pINT,
-	pSTRING,
-	PLABEL,
-	PGOTO,
-	PEND,
-
-	LEVEL,
-	LEX,
-	AST,
-	TAC,
-	HIR,
-	LIR,
-	ASM,
-	ELSE,
-	OR,
-	AND,
-	REP,
-	END_COND,
-	TOK,
-	TOKWN,
-	NEWLINE,
-	PNEWLINE,
-
-	LT,
-	GT,
-	EQ,
-	BANG,
-	PLUS,
-	MINUS,
-	DOT,
-	COMMA,
-	LPAREN,
-	RPAREN,
-	LBRACK,
-	RBRACK,
-
-	TOKEN,
-	wORD,
-	ANY,
-
-	ENUM_LEN
-};
-struct InternEntry {
-	uint32_t id;
-	std::string text;
-	bool is_int = false;
-	int64_t num = 0;
-	bool is_macro_var = false; 
-};
-
-std::vector<InternEntry> id_table = {
-	{ NOT_FOUND, "" },
-	{ PIF,       "pif" },
-	{ PELIF,       "pelif" },
-	{ PELSE,       "pelse" },
-	{ PWHILE,    "pwhile" },
-	{ pINT,      "pint" },
-	{ pSTRING,   "pstring" },
-	{ PLABEL,    "plabel" },
-	{ PGOTO,     "pgoto" },
-	{ PEND,      "pend" },
-	{ LEVEL,     "level" },
-	{ LEX,       "lex" },
-	{ AST,       "ast" },
-	{ TAC,       "tac" },
-	{ HIR,       "hir" },
-	{ LIR,       "lir" },
-	{ ASM,       "asm" },
-	{ ELSE,      "else" },
-	{ OR,        "or" },
-	{ AND,       "and" },
-	{ REP,       "rep" },
-	{ END_COND,  "end_cond" },
-	{ TOK,       "tok" },
-	{ TOKWN,     "tokwn" },
-	{ NEWLINE,   "\n" },
-	{ PNEWLINE,  "pnewline" },
-	{ LT,        "<" },
-	{ GT,        ">" },
-	{ EQ,        "=" },
-	{ BANG,      "!" },
-	{ PLUS,      "+" },
-	{ MINUS,     "-" },
-	{ DOT,       "." },
-	{ COMMA,     "," },
-	{ LPAREN,    "(" },
-	{ RPAREN,    ")" },
-	{ LBRACK,    "[" },
-	{ RBRACK,    "]" },
-	{ TOKEN,     "token" },
-	{ wORD,      "word" },
-	{ ANY,       "any" },
-};
+#include <deque>
 
 
 #include "command.h"
@@ -119,7 +20,13 @@ std::vector<InternEntry> id_table = {
 #include "interning.h"
 #include "properties.h"
 #include "token.h"
+
+
+
+
 #include "macro_engine.h"
+
+
 #include "orig.h"
 #include "lex.h"
 
@@ -128,8 +35,8 @@ std::vector<InternEntry> id_table = {
 int main(int argc, char* argv[]) {
 
 
+	/*
 	
-
 	if (argc < 2 or (argc == 2 and std::string(argv[1]) == "help")) {
 		print_help();
 		return 0;
@@ -149,13 +56,14 @@ int main(int argc, char* argv[]) {
 		print_help();
 		return 0;
 	}
-
-
+	*/
+	/*
 	build:
-
+	*/
 	auto start = std::chrono::steady_clock::now();
 
-	std::string path = argv[2];
+//	std::string path = argv[2];
+	std::string path = "C:\\Users\\admin\\Desktop\\lang_lapskran\\main.lps";
 	std::string source = expand(path);   // ← вот здесь
 	/*
 	for (int i = 0; i < source.size(); i++) {
@@ -177,7 +85,9 @@ int main(int argc, char* argv[]) {
 
 	std::vector<uint32_t> ntokens = intern_all(tokens);
 
-	ntokens = mengine::init(ntokens);
+	ntokens = mengine::init_pipeline(ntokens);
+	ntokens = mengine::init_funs(ntokens);
+	ntokens = mengine::init_patterns(ntokens);
 
 	btree::create_tree("main");
 	btree::use("main");
@@ -190,14 +100,18 @@ int main(int argc, char* argv[]) {
 	tokens.clear();
 	tokens.shrink_to_fit();
 
-	for (int i = 0; i < (int)mengine::lex_pattern.size(); i++) {
-		mengine::match(i);
-	}
+	for (auto& v : mengine::patterns)
+		for (std::size_t j = 0; j < v.size(); ++j)
+			mengine::match(v, (int)j);
 
 	auto end = std::chrono::steady_clock::now();
 
+
+
+
+
 	auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
-	std::cout << "elapsed: " << ms << " ms" << std::endl;
+	//std::cout << "elapsed: " << ms << " ms" << std::endl;
 
 	int iii = 0;
 	for (int i = 0; i < btree::get_length(); i++) {

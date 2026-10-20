@@ -149,7 +149,10 @@
     <ClInclude Include="importer.h" />
     <ClInclude Include="Interning.h" />
     <ClInclude Include="lex.h" />
+    <ClInclude Include="macro_common.h" />
+    <ClInclude Include="macro_init.h" />
     <ClInclude Include="macro_engine.h" />
+    <ClInclude Include="macro_match.h" />
     <ClInclude Include="orig.h" />
     <ClInclude Include="properties.h" />
     <ClInclude Include="token.h" />

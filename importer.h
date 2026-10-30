@@ -1,65 +1,119 @@
 #pragma once
+using namespace std;
+vector<string> gen_words_array(string src);
+
+
+	
+//грязный вонючий костыль
+struct Word {
+	std::string word;
+	std::string file_name;
+	std::string line_in_file;
+
+};
+///
+
+
 struct Frame {
-    std::string text;
-    size_t pos;
-    std::string dir;   // папка, где лежит этот файл
+	std::string text;
+	size_t pos;
+	std::string dir;
+	std::string file;
+	int line;
 };
 
-// отрезать имя файла, оставить папку вместе со слэшем
 std::string dir_of(const std::string& path) {
-    size_t p = path.find_last_of("\\/");
-    return (p == std::string::npos) ? "" : path.substr(0, p + 1);
+	size_t p = path.find_last_of("\\/");
+	if (p == std::string::npos) {
+		return "";
+	}
+	return path.substr(0, p + 1);
 }
 
-std::string expand(const std::string& root) {
+std::string load_file(const std::string& p) {
 
-    std::set<std::string> visited;
-    std::vector<Frame> stack;
-    std::string out;
+	FILE* f = fopen(p.c_str(), "rb");
+	if (f == nullptr) {
+		printf("cannot open: %s\n", p.c_str());
+		exit(1);
+	}
 
-    auto load = [](const std::string& p) -> std::string {
-        std::ifstream f(p, std::ios::binary);
-        if (!f) { std::cout << "cannot open: " << p << "\n"; exit(1); }
-        std::stringstream ss;
-        ss << f.rdbuf();
-        return ss.str();
-        };
+	std::string data;
+	char buf[4096];
 
-    visited.insert(root);
-    stack.push_back({ load(root), 0, dir_of(root) });
+	while (true) {
+		size_t n = fread(buf, 1, sizeof(buf), f);
+		if (n == 0) {
+			break;
+		}
+		data.append(buf, n);
+	}
 
-    while (!stack.empty()) {
+	fclose(f);
+	return data;
+}
 
-        Frame& top = stack.back();
+vector<Word> expand(const std::string& root) {
 
-        if (top.pos >= top.text.size()) {
-            stack.pop_back();
-            continue;
-        }
+	std::set<std::string> visited;
+	std::vector<Frame> stack;
+	vector<Word> out;
 
-        size_t nl = top.text.find('\n', top.pos);
-        if (nl == std::string::npos) nl = top.text.size();
 
-        std::string line = top.text.substr(top.pos, nl - top.pos);
-        if (!line.empty() && line.back() == '\r') line.pop_back();
+	visited.insert(root);
+	stack.push_back({ load_file(root), 0, dir_of(root), root,0});
 
-        top.pos = (nl < top.text.size()) ? nl + 1 : nl;
+	while (!stack.empty()) {
 
-        if (line.compare(0, 7, "import ") == 0) {
+		Frame& top = stack.back();
 
-            std::string sub = line.substr(7);
-            std::string full = top.dir + sub;   // относительно папки текущего файла
+		if (top.pos >= top.text.size()) {
+			stack.pop_back();
+			continue;
+		}
 
-            if (!visited.count(full)) {
-                visited.insert(full);
-                stack.push_back({ load(full), 0, dir_of(full) });
-            }
-        }
-        else {
-            out += line;
-            out += "\n";
-        }
-    }
+		size_t nl = top.text.find('\n', top.pos);
+		if (nl == std::string::npos) {
+			nl = top.text.size();
+		}
 
-    return out;
+		std::string line = top.text.substr(top.pos, nl - top.pos);
+		std::string file_name = top.file;
+		top.line++;
+
+		if (!line.empty() && line.back() == '\r') {
+			line.pop_back();
+		}
+
+		if (nl < top.text.size()) {
+			top.pos = nl + 1;
+		}
+		else {
+			top.pos = nl;
+		}
+
+		if (line.compare(0, 7, "import ") == 0) {
+
+			std::string sub = line.substr(7);
+			std::string full = top.dir + sub;
+
+			if (!visited.count(full)) {
+				visited.insert(full);
+				stack.push_back({ load_file(full), 0, dir_of(full), full,0 });
+			}
+		}
+		else {
+
+			std::vector<std::string> words = gen_words_array(line);
+			for (size_t w = 0; w < words.size(); w++) {
+
+				out.push_back({words[w],file_name,to_string(top.line)});
+				
+			}
+			out.push_back({ "\n",file_name,to_string(top.line) });
+		
+		}
+	}
+
+	return out;
 }

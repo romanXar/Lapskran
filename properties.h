@@ -1,4 +1,5 @@
 #pragma once
+const std::string& get_str(uint32_t id);
 
 namespace props {
 	std::unordered_map<uint32_t, std::unordered_map<int, std::map<uint32_t, uint32_t>>> db;
@@ -21,11 +22,11 @@ namespace props {
 		db[name][id][key] = val;
 	}
 
-	uint32_t get(uint32_t name, int id, uint32_t key) {
-		auto it_name = db.find(name);
+	uint32_t get(Token token, uint32_t key) {
+		auto it_name = db.find(token.name);
 		if (it_name == db.end()) return NOT_FOUND;
 
-		auto it_id = it_name->second.find(id);
+		auto it_id = it_name->second.find(token.id);
 		if (it_id == it_name->second.end()) return NOT_FOUND;
 
 		auto it_key = it_id->second.find(key);

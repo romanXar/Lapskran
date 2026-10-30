@@ -4,7 +4,6 @@ using namespace std;
 
 vector<string> gen_words_array(string src) {
 
-	// убрать BOM
 	if (src.size() >= 3 &&
 		(unsigned char)src[0] == 0xEF &&
 		(unsigned char)src[1] == 0xBB &&

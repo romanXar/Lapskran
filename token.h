@@ -1,33 +1,30 @@
 #pragma once
 
-namespace btree {
-	inline void erase_chunk(int elem_pos);
+enum class CArrayMode {
+	TStream,
+	Stack
+};
 
-	uint32_t id_total = 1;
-	const int CAP = 512;
-	const int B = 32;
-	const int MAX_DEPTH = 64;
-	const int MAX_NEW_CHUNKS = 64;
+template<typename T, CArrayMode Mode = CArrayMode::TStream,	int CAP = 512, int B = 32,int MAX_DEPTH = 64, int MAX_NEW_CHUNKS = 64> 
+class CArray {
 
-	struct Token {
-		uint32_t id;
-		uint32_t name;
-	};
+private:
 
+	static inline uint32_t id_total = 1;
+	
 	struct Chunk {
-		Token items[CAP];
-		int live, offset;
+		T items[CAP];
+		intptr_t live, offset;
 
 		Chunk() {
 			live = 0;
 			offset = 0;
 		}
 	};
-	inline void insert_chunk(int elem_pos, Chunk* nc);
 
 	struct Node {
 		bool  leaf;
-		int   num, count;
+		intptr_t   num, count;
 
 		Node** children;
 		Chunk** chunks;
@@ -48,12 +45,12 @@ namespace btree {
 		{
 			if (leaf)
 			{
-				for (int i = 0; i < num; ++i) delete chunks[i];
+				for (intptr_t i = 0; i < num; ++i) delete chunks[i];
 				delete[] chunks;
 			}
 			else
 			{
-				for (int i = 0; i < num; ++i) delete children[i];
+				for (intptr_t i = 0; i < num; ++i) delete children[i];
 				delete[] children;
 			}
 		}
@@ -63,7 +60,7 @@ namespace btree {
 
 	struct Tree {
 		Node* root, * cache_leaf;
-		int   current_total, old_total, cache_prefix;
+		intptr_t   current_total, old_total, cache_prefix;
 
 		Tree() {
 
@@ -78,50 +75,29 @@ namespace btree {
 
 	};
 
-	inline std::unordered_map<std::string, Tree*> trees;
-	inline Tree* current = nullptr;
+	Tree* current = nullptr;
 
-	inline int get_resize() {
-		return current->current_total - current->old_total;
-	}
 
-	inline void create_tree(std::string name) {
-		trees[name] = new Tree;
-	}
-
-	inline void use(std::string name) {
-		current = trees[name];
-	}
-
-	inline unsigned int get_length() {
-		return current->current_total;
-	}
-
-	inline void destroy_tree(std::string name) {
-		delete trees[name];
-		trees[name] = nullptr;
-	}
-
-	inline Token& dummy_token() {
-		static Token t;
+	T& dummy_token() {
+		static T t;
 		return t;
 	}
 
-	inline void recalc(Node* n) {
-		int s = 0;
+	void recalc(Node* n) {
+		intptr_t s = 0;
 		if (n->leaf) {
-			for (int i = 0; i < n->num; i++) s += n->chunks[i]->live;
+			for (intptr_t i = 0; i < n->num; i++) s += n->chunks[i]->live;
 		}
 		else {
-			for (int i = 0; i < n->num; i++) s += n->children[i]->count;
+			for (intptr_t i = 0; i < n->num; i++) s += n->children[i]->count;
 		}
 		n->count = s;
 	}
 
-	inline Node* descend(int i, int& prefix, int& local) {
+	Node* descend(intptr_t i, intptr_t& prefix, intptr_t& local) {
 		if (current->cache_leaf) {
-			int first = current->cache_prefix;
-			int last = first + current->cache_leaf->count;
+			intptr_t first = current->cache_prefix;
+			intptr_t last = first + current->cache_leaf->count;
 			if (i >= first && i < last) {
 				prefix = first;
 				local = i - first;
@@ -130,13 +106,13 @@ namespace btree {
 		}
 
 		Node* cur = current->root;
-		int p = 0;
-		int rem = i;
+		intptr_t p = 0;
+		intptr_t rem = i;
 		while (!cur->leaf) {
-			int acc = 0;
-			int k = 0;
+			intptr_t acc = 0;
+			intptr_t k = 0;
 			while (k < cur->num - 1) {
-				int c = cur->children[k]->count;
+				intptr_t c = cur->children[k]->count;
 				if (acc + c > rem) break;
 				acc += c;
 				k++;
@@ -155,24 +131,24 @@ namespace btree {
 
 	struct DescentPath {
 		Node* nodes[MAX_DEPTH];
-		int   depth = 0;
+		intptr_t   depth = 0;
 		Node* leaf = nullptr;
-		int   prefix = 0;
-		int   local = 0;
+		intptr_t   prefix = 0;
+		intptr_t   local = 0;
 
 		DescentPath() = default;
 	};
 
-	inline DescentPath descend_path(int i) {
+	DescentPath descend_path(intptr_t i) {
 		DescentPath dp;
 		Node* cur = current->root;
-		int p = 0;
-		int rem = i;
+		intptr_t p = 0;
+		intptr_t rem = i;
 		while (!cur->leaf) {
-			int acc = 0;
-			int k = 0;
+			intptr_t acc = 0;
+			intptr_t k = 0;
 			while (k < cur->num - 1) {
-				int c = cur->children[k]->count;
+				intptr_t c = cur->children[k]->count;
 				if (acc + c > rem) break;
 				acc += c;
 				k++;
@@ -188,29 +164,29 @@ namespace btree {
 		return dp;
 	}
 
-	inline void update_path_counts(DescentPath& dp) {
+	void update_path_counts(DescentPath& dp) {
 		recalc(dp.leaf);
-		for (int i = dp.depth - 1; i >= 0; i--) recalc(dp.nodes[i]);
+		for (intptr_t i = dp.depth - 1; i >= 0; i--) recalc(dp.nodes[i]);
 	}
 
-	inline void add_counts_path(DescentPath& dp, int delta) {
+	void add_counts_path(DescentPath& dp, intptr_t delta) {
 		dp.leaf->count += delta;
-		for (int i = 0; i < dp.depth; i++) {
+		for (intptr_t i = 0; i < dp.depth; i++) {
 			dp.nodes[i]->count += delta;
 		}
 	}
 
-	inline void replace_chunk_in_leaf(DescentPath& dp, int k,
-		Chunk** ncs, int num_chunks) {
 
-		int acc = 0;
-		for (int i = 0; i < k; i++) acc += dp.leaf->chunks[i]->live;
-		int cur_pos = dp.prefix + acc;
+	void replace_chunk_in_leaf(DescentPath& dp, intptr_t k, Chunk** ncs, intptr_t num_chunks) {
+
+		intptr_t acc = 0;
+		for (intptr_t i = 0; i < k; i++) acc += dp.leaf->chunks[i]->live;
+		intptr_t cur_pos = dp.prefix + acc;
 
 		erase_chunk(cur_pos);
 
-		int ins_pos = cur_pos;
-		for (int ci = 0; ci < num_chunks; ci++) {
+		intptr_t ins_pos = cur_pos;
+		for (intptr_t ci = 0; ci < num_chunks; ci++) {
 			insert_chunk(ins_pos, ncs[ci]);
 			ins_pos += ncs[ci]->live;
 		}
@@ -218,25 +194,25 @@ namespace btree {
 		current->cache_leaf = nullptr;
 	}
 
-	Node* insert_rec(Node* n, int elem_pos, Chunk* nc) {
+	Node* insert_rec(Node* n, intptr_t elem_pos, Chunk* nc) {
 		if (n->leaf) {
-			int acc = 0;
-			int k = 0;
+			intptr_t acc = 0;
+			intptr_t k = 0;
 			while (k < n->num) {
-				int c = n->chunks[k]->live;
+				intptr_t c = n->chunks[k]->live;
 				if (acc + c > elem_pos) break;
 				acc += c;
 				k++;
 			}
-			for (int i = n->num; i > k; i--) n->chunks[i] = n->chunks[i - 1];
+			for (intptr_t i = n->num; i > k; i--) n->chunks[i] = n->chunks[i - 1];
 			n->chunks[k] = nc;
 			n->num++;
 			n->count += nc->live;
 
 			if (n->num > B) {
 				Node* right = new Node(true);
-				int mid = n->num / 2;
-				for (int i = mid; i < n->num; i++) right->chunks[i - mid] = n->chunks[i];
+				intptr_t mid = n->num / 2;
+				for (intptr_t i = mid; i < n->num; i++) right->chunks[i - mid] = n->chunks[i];
 				right->num = n->num - mid;
 				n->num = mid;
 				recalc(n);
@@ -246,19 +222,19 @@ namespace btree {
 			return nullptr;
 		}
 
-		int acc = 0;
-		int k = 0;
+		intptr_t acc = 0;
+		intptr_t k = 0;
 		while (k < n->num - 1) {
-			int c = n->children[k]->count;
+			intptr_t c = n->children[k]->count;
 			if (acc + c > elem_pos) break;
 			acc += c;
 			k++;
 		}
-		int sub = elem_pos - acc;
+		intptr_t sub = elem_pos - acc;
 
 		Node* split_node = insert_rec(n->children[k], sub, nc);
 		if (split_node) {
-			for (int i = n->num; i > k + 1; i--) n->children[i] = n->children[i - 1];
+			for (intptr_t i = n->num; i > k + 1; i--) n->children[i] = n->children[i - 1];
 			n->children[k + 1] = split_node;
 			n->num++;
 		}
@@ -266,8 +242,8 @@ namespace btree {
 
 		if (n->num > B) {
 			Node* right = new Node(false);
-			int mid = n->num / 2;
-			for (int i = mid; i < n->num; i++) right->children[i - mid] = n->children[i];
+			intptr_t mid = n->num / 2;
+			for (intptr_t i = mid; i < n->num; i++) right->children[i - mid] = n->children[i];
 			right->num = n->num - mid;
 			n->num = mid;
 			recalc(n);
@@ -277,7 +253,7 @@ namespace btree {
 		return nullptr;
 	}
 
-	inline void insert_chunk(int elem_pos, Chunk* nc) {
+	void insert_chunk(intptr_t elem_pos, Chunk* nc) {
 		if (!current->root) {
 			current->root = new Node(true);
 			current->root->chunks[0] = nc;
@@ -312,7 +288,7 @@ namespace btree {
 		}
 
 		Node* path[MAX_DEPTH];
-		int depth = 0;
+		intptr_t depth = 0;
 		Node* cur = current->root;
 		while (!cur->leaf) {
 			path[depth++] = cur;
@@ -326,14 +302,14 @@ namespace btree {
 		Node* node = cur;
 		while (node->num > B) {
 			Node* right = new Node(node->leaf);
-			int mid = node->num / 2;
+			intptr_t mid = node->num / 2;
 			if (node->leaf) {
-				for (int i = mid; i < node->num; i++) right->chunks[i - mid] = node->chunks[i];
+				for (intptr_t i = mid; i < node->num; i++) right->chunks[i - mid] = node->chunks[i];
 				right->num = node->num - mid;
 				node->num = mid;
 			}
 			else {
-				for (int i = mid; i < node->num; i++) right->children[i - mid] = node->children[i];
+				for (intptr_t i = mid; i < node->num; i++) right->children[i - mid] = node->children[i];
 				right->num = node->num - mid;
 				node->num = mid;
 			}
@@ -356,66 +332,66 @@ namespace btree {
 			recalc(parent);
 			node = parent;
 		}
-		for (int i = depth - 1; i >= 0; i--) recalc(path[i]);
+		for (intptr_t i = depth - 1; i >= 0; i--) recalc(path[i]);
 		current->current_total += nc->live;
 		current->cache_leaf = nullptr;
 	}
 
-	bool erase_rec(Node* n, int elem_pos) {
+	bool erase_rec(Node* n, intptr_t elem_pos) {
 		if (n->leaf) {
-			int acc = 0;
-			int k = 0;
+			intptr_t acc = 0;
+			intptr_t k = 0;
 			while (k < n->num) {
-				int c = n->chunks[k]->live;
+				intptr_t c = n->chunks[k]->live;
 				if (acc + c > elem_pos) break;
 				acc += c;
 				k++;
 			}
 			if (k >= n->num) return false;
-			int removed = n->chunks[k]->live;
+			intptr_t removed = n->chunks[k]->live;
 			delete n->chunks[k];
-			for (int i = k; i < n->num - 1; i++) n->chunks[i] = n->chunks[i + 1];
+			for (intptr_t i = k; i < n->num - 1; i++) n->chunks[i] = n->chunks[i + 1];
 			n->num--;
 			n->count -= removed;
 			return n->num == 0;
 		}
 
-		int acc = 0;
-		int k = 0;
+		intptr_t acc = 0;
+		intptr_t k = 0;
 		while (k < n->num - 1) {
-			int c = n->children[k]->count;
+			intptr_t c = n->children[k]->count;
 			if (acc + c > elem_pos) break;
 			acc += c;
 			k++;
 		}
 		if (k >= n->num) return false;
 
-		int old_count = n->children[k]->count;
+		intptr_t old_count = n->children[k]->count;
 		bool empty = erase_rec(n->children[k], elem_pos - acc);
-		int new_count = empty ? 0 : n->children[k]->count;
+		intptr_t new_count = empty ? 0 : n->children[k]->count;
 		n->count -= (old_count - new_count);
 
 		if (empty) {
 			delete n->children[k];
-			for (int i = k; i < n->num - 1; i++) n->children[i] = n->children[i + 1];
+			for (intptr_t i = k; i < n->num - 1; i++) n->children[i] = n->children[i + 1];
 			n->num--;
 		}
 		return n->num == 0;
 	}
 
-	inline void erase_chunk(int elem_pos) {
+	void erase_chunk(intptr_t elem_pos) {
 		if (!current->root) return;
-		int prefix, local;
+		intptr_t prefix, local;
 		Node* leaf = descend(elem_pos, prefix, local);
-		int acc = 0;
-		int k = 0;
+		intptr_t acc = 0;
+		intptr_t k = 0;
 		while (k < leaf->num) {
-			int c = leaf->chunks[k]->live;
+			intptr_t c = leaf->chunks[k]->live;
 			if (acc + c > local) break;
 			acc += c;
 			k++;
 		}
-		int removed_live = (k < leaf->num) ? leaf->chunks[k]->live : 0;
+		intptr_t removed_live = (k < leaf->num) ? leaf->chunks[k]->live : 0;
 
 		bool empty = erase_rec(current->root, elem_pos);
 		if (empty) {
@@ -432,42 +408,103 @@ namespace btree {
 		current->cache_leaf = nullptr;
 	}
 
-	inline Token& get(int i) {
+
+
+public:
+	
+	void EnsureSize(intptr_t target_size) {
+		if (target_size <= current->current_total) return; 
+
+		intptr_t n = target_size - current->current_total; 
+		current->old_total = current->current_total;
+
+		if (!current->root) {
+			intptr_t w = 0;
+			while (w < n) {
+				Chunk* nc = new Chunk;
+				intptr_t take = n - w;
+				if (take > CAP) take = CAP;
+				nc->live = take; 
+				append_chunk(nc);
+				w += take;
+			}
+			current->cache_leaf = nullptr;
+			return;
+		}
+
+		Node* path[MAX_DEPTH];
+		intptr_t depth = 0;
+		Node* cur = current->root;
+		while (!cur->leaf) {
+			path[depth++] = cur;
+			cur = cur->children[cur->num - 1];
+		}
+
+		intptr_t w = 0;
+
+		if (cur->num > 0) {
+			Chunk* last = cur->chunks[cur->num - 1];
+			intptr_t avail_end = CAP - last->offset - last->live;
+			intptr_t take = (avail_end > n - w) ? n - w : avail_end;
+
+			last->live += take; 
+			w += take;
+
+			cur->count += take;
+			for (intptr_t p = 0; p < depth; p++) path[p]->count += take;
+			current->current_total += take;
+		}
+
+		while (w < n) {
+			Chunk* nc = new Chunk;
+			intptr_t take = n - w;
+			if (take > CAP) take = CAP;
+
+			nc->live = take;
+			append_chunk(nc);
+			w += take;
+		}
+
+		current->cache_leaf = nullptr;
+	}
+
+	T& get(intptr_t i) {
 		if (i < 0 || i >= current->current_total) return dummy_token();
-		int prefix, local;
+		intptr_t prefix, local;
 		Node* leaf = descend(i, prefix, local);
-		int acc = 0;
-		for (int k = 0; k < leaf->num; k++) {
+		intptr_t acc = 0;
+		for (intptr_t k = 0; k < leaf->num; k++) {
 			Chunk* ch = leaf->chunks[k];
-			int c = ch->live;
+			intptr_t c = ch->live;
 			if (acc + c > local) return ch->items[ch->offset + (local - acc)];
 			acc += c;
 		}
 		return dummy_token();
 	}
 
-	inline void set(int i, int j, const Token* src, int& n) {
+	void set(intptr_t i, intptr_t j, const T* src, int& n) {
 		current->old_total = current->current_total;
 
 		if (i < 0) i = 0;
 		if (j > current->current_total) j = current->current_total;
 		if (i > j) i = j;
 
-		if (n > 0 and j < current->current_total and get(j).name == NEWLINE and src[n - 1].name == NEWLINE) {
-			current->old_total--;
-			j++;
-		}
-		if (n > 0 and j == current->current_total and src[n - 1].name == NEWLINE) n--;
-		if (n > 0 and i > 0 and get(i - 1).name == NEWLINE and src[0].name == NEWLINE) i--;
+		if constexpr (Mode == CArrayMode::TStream) {
 
-		// ---------- in-place ----------
+			if (n > 0 and j < current->current_total and get(j).name == NEWLINE and src[n - 1].name == NEWLINE) {
+				current->old_total--;
+				j++;
+			}
+			if (n > 0 and j == current->current_total and src[n - 1].name == NEWLINE) n--;
+			if (n > 0 and i > 0 and get(i - 1).name == NEWLINE and src[0].name == NEWLINE) i--;
+		}
 		if (n > 0 && n == j - i) {
-			int w = 0;
-			int pos = i;
+			intptr_t w = 0;
+			intptr_t pos = i;
 			while (w < n) {
 				DescentPath dp = descend_path(pos);
-				int acc = 0;
-				int k = 0;
+				intptr_t acc = 0;
+				intptr_t k = 0;
 				while (k < dp.leaf->num) {
 					Chunk* ch = dp.leaf->chunks[k];
 					if (acc + ch->live > dp.local) break;
@@ -475,10 +512,10 @@ namespace btree {
 					k++;
 				}
 				Chunk* ch = dp.leaf->chunks[k];
-				int idx_in_chunk = dp.local - acc;
-				int take = ch->live - idx_in_chunk;
+				intptr_t idx_in_chunk = dp.local - acc;
+				intptr_t take = ch->live - idx_in_chunk;
 				if (take > n - w) take = n - w;
-				for (int p = 0; p < take; p++)
+				for (intptr_t p = 0; p < take; p++)
 					ch->items[ch->offset + idx_in_chunk + p] = src[w + p];
 				w += take;
 				pos += take;
@@ -487,14 +524,13 @@ namespace btree {
 			return;
 		}
 
-		// ---------- erase [i, j) ----------
 		if (j > i) {
-			int left = j - i;
-			int pos = i;
+			intptr_t left = j - i;
+			intptr_t pos = i;
 			while (left > 0) {
 				DescentPath dp = descend_path(pos);
-				int acc = 0;
-				int k = 0;
+				intptr_t acc = 0;
+				intptr_t k = 0;
 				while (k < dp.leaf->num) {
 					Chunk* ch = dp.leaf->chunks[k];
 					if (acc + ch->live > dp.local) break;
@@ -502,22 +538,22 @@ namespace btree {
 					k++;
 				}
 				Chunk* ch = dp.leaf->chunks[k];
-				int idx_in_chunk = dp.local - acc;
-				int avail = ch->live - idx_in_chunk;
-				int take = (avail > left) ? left : avail;
+				intptr_t idx_in_chunk = dp.local - acc;
+				intptr_t avail = ch->live - idx_in_chunk;
+				intptr_t take = (avail > left) ? left : avail;
 
 				if (take == ch->live) {
 					erase_chunk(pos);
 				}
 				else {
-					int tail = ch->live - idx_in_chunk - take;
+					intptr_t tail = ch->live - idx_in_chunk - take;
 					if (idx_in_chunk < tail) {
-						for (int p = idx_in_chunk - 1; p >= 0; p--)
+						for (intptr_t p = idx_in_chunk - 1; p >= 0; p--)
 							ch->items[ch->offset + p + take] = std::move(ch->items[ch->offset + p]);
 						ch->offset += take;
 					}
 					else {
-						for (int p = 0; p < tail; p++)
+						for (intptr_t p = 0; p < tail; p++)
 							ch->items[ch->offset + idx_in_chunk + p] = std::move(ch->items[ch->offset + idx_in_chunk + take + p]);
 					}
 					ch->live -= take;
@@ -529,13 +565,12 @@ namespace btree {
 			current->cache_leaf = nullptr;
 		}
 
-		// ---------- insert n в позицию i ----------
 		if (n > 0) {
 			if (i == current->current_total || !current->root) {
-				int w = 0;
+				intptr_t w = 0;
 				if (current->root) {
 					Node* path[MAX_DEPTH];
-					int depth = 0;
+					intptr_t depth = 0;
 					Node* cur = current->root;
 					while (!cur->leaf) {
 						path[depth++] = cur;
@@ -543,22 +578,22 @@ namespace btree {
 					}
 					if (cur->num > 0) {
 						Chunk* last = cur->chunks[cur->num - 1];
-						int avail_end = CAP - last->offset - last->live;
-						int take = (avail_end > n - w) ? n - w : avail_end;
-						for (int p = 0; p < take; p++)
+						intptr_t avail_end = CAP - last->offset - last->live;
+						intptr_t take = (avail_end > n - w) ? n - w : avail_end;
+						for (intptr_t p = 0; p < take; p++)
 							last->items[last->offset + last->live + p] = src[w + p];
 						last->live += take;
 						w += take;
 						cur->count += take;
-						for (int p = 0; p < depth; p++) path[p]->count += take;
+						for (intptr_t p = 0; p < depth; p++) path[p]->count += take;
 					}
 					current->current_total += w;
 				}
 				while (w < n) {
 					Chunk* nc = new Chunk;
-					int take = n - w;
+					intptr_t take = n - w;
 					if (take > CAP) take = CAP;
-					for (int p = 0; p < take; p++) nc->items[p] = src[w + p];
+					for (intptr_t p = 0; p < take; p++) nc->items[p] = src[w + p];
 					nc->live = take;
 					append_chunk(nc);
 					w += take;
@@ -568,8 +603,8 @@ namespace btree {
 			}
 
 			DescentPath dp = descend_path(i);
-			int acc = 0;
-			int k = 0;
+			intptr_t acc = 0;
+			intptr_t k = 0;
 			while (k < dp.leaf->num) {
 				Chunk* ch = dp.leaf->chunks[k];
 				if (acc + ch->live > dp.local) break;
@@ -577,13 +612,13 @@ namespace btree {
 				k++;
 			}
 			Chunk* cur = dp.leaf->chunks[k];
-			int cur_offset = dp.local - acc;
+			intptr_t cur_offset = dp.local - acc;
 
 			if (cur->live + n <= CAP) {
-				int left_count = cur_offset;
-				int right_count = cur->live - cur_offset;
-				int free_left = cur->offset;
-				int free_right = CAP - cur->offset - cur->live;
+				intptr_t left_count = cur_offset;
+				intptr_t right_count = cur->live - cur_offset;
+				intptr_t free_left = cur->offset;
+				intptr_t free_right = CAP - cur->offset - cur->live;
 				bool can_left = (free_left >= n);
 				bool can_right = (free_right >= n);
 
@@ -591,10 +626,10 @@ namespace btree {
 				bool use_right = !use_left && can_right;
 
 				if (use_left) {
-					for (int p = 0; p < left_count; p++)
+					for (intptr_t p = 0; p < left_count; p++)
 						cur->items[cur->offset + p - n] = std::move(cur->items[cur->offset + p]);
 					cur->offset -= n;
-					for (int p = 0; p < n; p++)
+					for (intptr_t p = 0; p < n; p++)
 						cur->items[cur->offset + cur_offset + p] = src[p];
 					cur->live += n;
 					add_counts_path(dp, n);
@@ -603,9 +638,9 @@ namespace btree {
 					return;
 				}
 				if (use_right) {
-					for (int p = right_count - 1; p >= 0; p--)
+					for (intptr_t p = right_count - 1; p >= 0; p--)
 						cur->items[cur->offset + cur_offset + n + p] = std::move(cur->items[cur->offset + cur_offset + p]);
-					for (int p = 0; p < n; p++)
+					for (intptr_t p = 0; p < n; p++)
 						cur->items[cur->offset + cur_offset + p] = src[p];
 					cur->live += n;
 					add_counts_path(dp, n);
@@ -615,21 +650,21 @@ namespace btree {
 				}
 			}
 
-			int old_live = cur->live;
-			int total_new = old_live + n;
-			int num_chunks = (total_new + CAP - 1) / CAP;
-			int cur_src_offset = cur->offset;
+			intptr_t old_live = cur->live;
+			intptr_t total_new = old_live + n;
+			intptr_t num_chunks = (total_new + CAP - 1) / CAP;
+			intptr_t cur_src_offset = cur->offset;
 
 			if (num_chunks > MAX_NEW_CHUNKS) {
 				std::vector<Chunk*> big_ncs(num_chunks);
-				int per = (total_new + num_chunks - 1) / num_chunks;
-				int pos2 = 0;
-				for (int ci = 0; ci < num_chunks; ci++) {
-					int take = per;
+				intptr_t per = (total_new + num_chunks - 1) / num_chunks;
+				intptr_t pos2 = 0;
+				for (intptr_t ci = 0; ci < num_chunks; ci++) {
+					intptr_t take = per;
 					if (pos2 + take > total_new) take = total_new - pos2;
 					Chunk* nc = new Chunk;
-					for (int p = 0; p < take; p++) {
-						int gi = pos2 + p;
+					for (intptr_t p = 0; p < take; p++) {
+						intptr_t gi = pos2 + p;
 						if (gi < cur_offset)          nc->items[p] = std::move(cur->items[cur_src_offset + gi]);
 						else if (gi < cur_offset + n) nc->items[p] = src[gi - cur_offset];
 						else                          nc->items[p] = std::move(cur->items[cur_src_offset + (gi - n)]);
@@ -638,10 +673,10 @@ namespace btree {
 					big_ncs[ci] = nc;
 					pos2 += take;
 				}
-				int cur_pos = dp.prefix + acc;
+				intptr_t cur_pos = dp.prefix + acc;
 				erase_chunk(cur_pos);
-				int ins_pos = cur_pos;
-				for (int ci = 0; ci < num_chunks; ci++) {
+				intptr_t ins_pos = cur_pos;
+				for (intptr_t ci = 0; ci < num_chunks; ci++) {
 					insert_chunk(ins_pos, big_ncs[ci]);
 					ins_pos += big_ncs[ci]->live;
 				}
@@ -650,14 +685,14 @@ namespace btree {
 			}
 
 			Chunk* ncs[MAX_NEW_CHUNKS];
-			int per = (total_new + num_chunks - 1) / num_chunks;
-			int pos2 = 0;
-			for (int ci = 0; ci < num_chunks; ci++) {
-				int take = per;
+			intptr_t per = (total_new + num_chunks - 1) / num_chunks;
+			intptr_t pos2 = 0;
+			for (intptr_t ci = 0; ci < num_chunks; ci++) {
+				intptr_t take = per;
 				if (pos2 + take > total_new) take = total_new - pos2;
 				Chunk* nc = new Chunk;
-				for (int p = 0; p < take; p++) {
-					int gi = pos2 + p;
+				for (intptr_t p = 0; p < take; p++) {
+					intptr_t gi = pos2 + p;
 					if (gi < cur_offset)          nc->items[p] = std::move(cur->items[cur_src_offset + gi]);
 					else if (gi < cur_offset + n) nc->items[p] = src[gi - cur_offset];
 					else                          nc->items[p] = std::move(cur->items[cur_src_offset + (gi - n)]);
@@ -672,7 +707,7 @@ namespace btree {
 		}
 	}
 
-	inline void push_back(const Token& t) {
+	void push_back(const T& t) {
 		if (!current->root) {
 			Chunk* nc = new Chunk;
 			nc->items[0] = t;
@@ -687,7 +722,7 @@ namespace btree {
 		}
 
 		Node* path[MAX_DEPTH];
-		int depth = 0;
+		intptr_t depth = 0;
 		Node* cur = current->root;
 		while (!cur->leaf) {
 			path[depth++] = cur;
@@ -696,18 +731,19 @@ namespace btree {
 
 		Chunk* last = cur->chunks[cur->num - 1];
 
-		if (t.name == NEWLINE
-			&& last->live > 0
-			&& last->items[last->offset + last->live - 1].name == NEWLINE)
-		{
-			return;
+		if constexpr (Mode == CArrayMode::TStream) {
+
+			if (t.name == NEWLINE && last->live > 0 && last->items[last->offset + last->live - 1].name == NEWLINE)
+			{
+				return;
+			}
 		}
 
 		if (last->offset + last->live < CAP) {
 			last->items[last->offset + last->live] = t;
 			last->live++;
 			cur->count++;
-			for (int i = depth - 1; i >= 0; i--) path[i]->count++;
+			for (intptr_t i = depth - 1; i >= 0; i--) path[i]->count++;
 			current->current_total++;
 			return;
 		}
@@ -719,22 +755,25 @@ namespace btree {
 		return;
 	}
 
-	inline void move_in(std::string dst_name, int i, int j) {
+	void move_in(CArray* dst_arr, intptr_t i, intptr_t j) {
 		Tree* src_tree = current;
 		if (!src_tree) return;
 
-		Tree* dst = trees[dst_name];
+		Tree* dst = dst_arr->current;
 		if (!dst || dst == src_tree) return;
 
-		std::string src_name;
-		for (auto& [n, t] : trees) {
-			if (t == src_tree) { src_name = n; break; }
+
+		intptr_t skip = 0;
+
+		if constexpr (Mode == CArrayMode::TStream) {
+			if (i == 0 && src_tree->current_total > 0 && get(0).name == NEWLINE) {
+				skip = 1;
+			}
 		}
 
-		int skip = (i == 0 && src_tree->current_total > 0 && get(0).name == NEWLINE) ? 1 : 0;
-		int n = src_tree->current_total - skip;
-		std::vector<Token> buf(n);
-		for (int k = 0; k < n; k++) buf[k] = get(k + skip);
+		intptr_t n = src_tree->current_total - skip;
+		std::vector<T> buf(n);
+		for (intptr_t k = 0; k < n; k++) buf[k] = get(k + skip);
 
 		current = dst;
 		current->old_total = current->current_total;
@@ -743,24 +782,27 @@ namespace btree {
 		if (j > current->current_total) j = current->current_total;
 		if (i > j) i = j;
 
-		if (n > 0 and j < current->current_total and get(j).name == NEWLINE and buf[n - 1].name == NEWLINE) {
-			current->old_total--;
-			j++;
+
+		if constexpr (Mode == CArrayMode::TStream) {
+
+			if (n > 0 and j < current->current_total and get(j).name == NEWLINE and buf[n - 1].name == NEWLINE) {
+				current->old_total--;
+				j++;
+			}
+
+			if (n > 0 and j == current->current_total and buf[n - 1].name == NEWLINE) n--;
+
+			if (n > 0 and i > 0 and get(i - 1).name == NEWLINE and buf[0].name == NEWLINE) {
+				i--;
+			}
 		}
-
-		if (n > 0 and j == current->current_total and buf[n - 1].name == NEWLINE) n--;
-
-		if (n > 0 and i > 0 and get(i - 1).name == NEWLINE and buf[0].name == NEWLINE) {
-			i--;
-		}
-
 		if (n > 0 && n == j - i) {
-			int w = 0;
-			int pos = i;
+			intptr_t w = 0;
+			intptr_t pos = i;
 			while (w < n) {
 				DescentPath dp = descend_path(pos);
-				int acc = 0;
-				int k = 0;
+				intptr_t acc = 0;
+				intptr_t k = 0;
 				while (k < dp.leaf->num) {
 					Chunk* ch = dp.leaf->chunks[k];
 					if (acc + ch->live > dp.local) break;
@@ -768,10 +810,10 @@ namespace btree {
 					k++;
 				}
 				Chunk* ch = dp.leaf->chunks[k];
-				int idx_in_chunk = dp.local - acc;
-				int take = ch->live - idx_in_chunk;
+				intptr_t idx_in_chunk = dp.local - acc;
+				intptr_t take = ch->live - idx_in_chunk;
 				if (take > n - w) take = n - w;
-				for (int p = 0; p < take; p++)
+				for (intptr_t p = 0; p < take; p++)
 					ch->items[ch->offset + idx_in_chunk + p] = buf[w + p];
 				w += take;
 				pos += take;
@@ -781,12 +823,12 @@ namespace btree {
 		}
 
 		if (j > i) {
-			int left = j - i;
-			int pos = i;
+			intptr_t left = j - i;
+			intptr_t pos = i;
 			while (left > 0) {
 				DescentPath dp = descend_path(pos);
-				int acc = 0;
-				int k = 0;
+				intptr_t acc = 0;
+				intptr_t k = 0;
 				while (k < dp.leaf->num) {
 					Chunk* ch = dp.leaf->chunks[k];
 					if (acc + ch->live > dp.local) break;
@@ -794,22 +836,22 @@ namespace btree {
 					k++;
 				}
 				Chunk* ch = dp.leaf->chunks[k];
-				int idx_in_chunk = dp.local - acc;
-				int avail = ch->live - idx_in_chunk;
-				int take = (avail > left) ? left : avail;
+				intptr_t idx_in_chunk = dp.local - acc;
+				intptr_t avail = ch->live - idx_in_chunk;
+				intptr_t take = (avail > left) ? left : avail;
 
 				if (take == ch->live) {
 					erase_chunk(pos);
 				}
 				else {
-					int tail = ch->live - idx_in_chunk - take;
+					intptr_t tail = ch->live - idx_in_chunk - take;
 					if (idx_in_chunk < tail) {
-						for (int p = idx_in_chunk - 1; p >= 0; p--)
+						for (intptr_t p = idx_in_chunk - 1; p >= 0; p--)
 							ch->items[ch->offset + p + take] = std::move(ch->items[ch->offset + p]);
 						ch->offset += take;
 					}
 					else {
-						for (int p = 0; p < tail; p++)
+						for (intptr_t p = 0; p < tail; p++)
 							ch->items[ch->offset + idx_in_chunk + p] = std::move(ch->items[ch->offset + idx_in_chunk + take + p]);
 					}
 					ch->live -= take;
@@ -823,10 +865,10 @@ namespace btree {
 
 		if (n > 0) {
 			if (i == current->current_total || !current->root) {
-				int w = 0;
+				intptr_t w = 0;
 				if (current->root) {
 					Node* path[MAX_DEPTH];
-					int depth = 0;
+					intptr_t depth = 0;
 					Node* cur = current->root;
 					while (!cur->leaf) {
 						path[depth++] = cur;
@@ -834,22 +876,22 @@ namespace btree {
 					}
 					if (cur->num > 0) {
 						Chunk* last = cur->chunks[cur->num - 1];
-						int avail_end = CAP - last->offset - last->live;
-						int take = (avail_end > n - w) ? n - w : avail_end;
-						for (int p = 0; p < take; p++)
+						intptr_t avail_end = CAP - last->offset - last->live;
+						intptr_t take = (avail_end > n - w) ? n - w : avail_end;
+						for (intptr_t p = 0; p < take; p++)
 							last->items[last->offset + last->live + p] = buf[w + p];
 						last->live += take;
 						w += take;
 						cur->count += take;
-						for (int p = 0; p < depth; p++) path[p]->count += take;
+						for (intptr_t p = 0; p < depth; p++) path[p]->count += take;
 					}
 					current->current_total += w;
 				}
 				while (w < n) {
 					Chunk* nc = new Chunk;
-					int take = n - w;
+					intptr_t take = n - w;
 					if (take > CAP) take = CAP;
-					for (int p = 0; p < take; p++) nc->items[p] = buf[w + p];
+					for (intptr_t p = 0; p < take; p++) nc->items[p] = buf[w + p];
 					nc->live = take;
 					append_chunk(nc);
 					w += take;
@@ -859,8 +901,8 @@ namespace btree {
 			}
 
 			DescentPath dp = descend_path(i);
-			int acc = 0;
-			int k = 0;
+			intptr_t acc = 0;
+			intptr_t k = 0;
 			while (k < dp.leaf->num) {
 				Chunk* ch = dp.leaf->chunks[k];
 				if (acc + ch->live > dp.local) break;
@@ -868,13 +910,13 @@ namespace btree {
 				k++;
 			}
 			Chunk* cur = dp.leaf->chunks[k];
-			int cur_offset = dp.local - acc;
+			intptr_t cur_offset = dp.local - acc;
 
 			if (cur->live + n <= CAP) {
-				int left_count = cur_offset;
-				int right_count = cur->live - cur_offset;
-				int free_left = cur->offset;
-				int free_right = CAP - cur->offset - cur->live;
+				intptr_t left_count = cur_offset;
+				intptr_t right_count = cur->live - cur_offset;
+				intptr_t free_left = cur->offset;
+				intptr_t free_right = CAP - cur->offset - cur->live;
 				bool can_left = (free_left >= n);
 				bool can_right = (free_right >= n);
 
@@ -882,10 +924,10 @@ namespace btree {
 				bool use_right = !use_left && can_right;
 
 				if (use_left) {
-					for (int p = 0; p < left_count; p++)
+					for (intptr_t p = 0; p < left_count; p++)
 						cur->items[cur->offset + p - n] = std::move(cur->items[cur->offset + p]);
 					cur->offset -= n;
-					for (int p = 0; p < n; p++)
+					for (intptr_t p = 0; p < n; p++)
 						cur->items[cur->offset + cur_offset + p] = buf[p];
 					cur->live += n;
 					add_counts_path(dp, n);
@@ -894,9 +936,9 @@ namespace btree {
 					goto cleanup;
 				}
 				if (use_right) {
-					for (int p = right_count - 1; p >= 0; p--)
+					for (intptr_t p = right_count - 1; p >= 0; p--)
 						cur->items[cur->offset + cur_offset + n + p] = std::move(cur->items[cur->offset + cur_offset + p]);
-					for (int p = 0; p < n; p++)
+					for (intptr_t p = 0; p < n; p++)
 						cur->items[cur->offset + cur_offset + p] = buf[p];
 					cur->live += n;
 					add_counts_path(dp, n);
@@ -906,21 +948,21 @@ namespace btree {
 				}
 			}
 
-			int old_live = cur->live;
-			int total_new = old_live + n;
-			int num_chunks = (total_new + CAP - 1) / CAP;
-			int cur_src_offset = cur->offset;
+			intptr_t old_live = cur->live;
+			intptr_t total_new = old_live + n;
+			intptr_t num_chunks = (total_new + CAP - 1) / CAP;
+			intptr_t cur_src_offset = cur->offset;
 
 			if (num_chunks > MAX_NEW_CHUNKS) {
 				std::vector<Chunk*> big_ncs(num_chunks);
-				int per = (total_new + num_chunks - 1) / num_chunks;
-				int pos2 = 0;
-				for (int ci = 0; ci < num_chunks; ci++) {
-					int take = per;
+				intptr_t per = (total_new + num_chunks - 1) / num_chunks;
+				intptr_t pos2 = 0;
+				for (intptr_t ci = 0; ci < num_chunks; ci++) {
+					intptr_t take = per;
 					if (pos2 + take > total_new) take = total_new - pos2;
 					Chunk* nc = new Chunk;
-					for (int p = 0; p < take; p++) {
-						int gi = pos2 + p;
+					for (intptr_t p = 0; p < take; p++) {
+						intptr_t gi = pos2 + p;
 						if (gi < cur_offset)          nc->items[p] = std::move(cur->items[cur_src_offset + gi]);
 						else if (gi < cur_offset + n) nc->items[p] = buf[gi - cur_offset];
 						else                          nc->items[p] = std::move(cur->items[cur_src_offset + (gi - n)]);
@@ -929,10 +971,10 @@ namespace btree {
 					big_ncs[ci] = nc;
 					pos2 += take;
 				}
-				int cur_pos = dp.prefix + acc;
+				intptr_t cur_pos = dp.prefix + acc;
 				erase_chunk(cur_pos);
-				int ins_pos = cur_pos;
-				for (int ci = 0; ci < num_chunks; ci++) {
+				intptr_t ins_pos = cur_pos;
+				for (intptr_t ci = 0; ci < num_chunks; ci++) {
 					insert_chunk(ins_pos, big_ncs[ci]);
 					ins_pos += big_ncs[ci]->live;
 				}
@@ -941,14 +983,14 @@ namespace btree {
 			}
 
 			Chunk* ncs[MAX_NEW_CHUNKS];
-			int per = (total_new + num_chunks - 1) / num_chunks;
-			int pos2 = 0;
-			for (int ci = 0; ci < num_chunks; ci++) {
-				int take = per;
+			intptr_t per = (total_new + num_chunks - 1) / num_chunks;
+			intptr_t pos2 = 0;
+			for (intptr_t ci = 0; ci < num_chunks; ci++) {
+				intptr_t take = per;
 				if (pos2 + take > total_new) take = total_new - pos2;
 				Chunk* nc = new Chunk;
-				for (int p = 0; p < take; p++) {
-					int gi = pos2 + p;
+				for (intptr_t p = 0; p < take; p++) {
+					intptr_t gi = pos2 + p;
 					if (gi < cur_offset)          nc->items[p] = std::move(cur->items[cur_src_offset + gi]);
 					else if (gi < cur_offset + n) nc->items[p] = buf[gi - cur_offset];
 					else                          nc->items[p] = std::move(cur->items[cur_src_offset + (gi - n)]);
@@ -963,12 +1005,28 @@ namespace btree {
 		}
 
 	cleanup:
-		trees.erase(src_name);
 		delete src_tree;
+		current = new Tree();
 	}
 
-	inline uint32_t gen_id() {
+	uintptr_t get_length() {
+		return current->current_total;
+	}
+
+	uintptr_t get_resize() {
+		return current->current_total - current->old_total;
+	}
+	static uint32_t gen_id() {
 		return id_total++;
 	}
 
-}
+	CArray() {
+		current = new Tree();
+	}
+
+	~CArray() {
+		delete current;
+	}
+
+};
+

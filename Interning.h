@@ -1,4 +1,9 @@
 #pragma once
+namespace props {
+	uint32_t get(uint32_t name, int id, uint32_t key);
+
+	void set(uint32_t name, int id, uint32_t key, uint32_t val);
+}
 
 enum Reserved {
 	NOT_FOUND,
@@ -29,6 +34,8 @@ enum Reserved {
 	TOKWN,
 	NEWLINE,
 	PNEWLINE,
+
+	PSHELL,
 
 	LT,
 	GT,
@@ -98,6 +105,7 @@ std::vector<InternEntry> id_table = {
 	{ TOKWN,     "tokwn" },
 	{ NEWLINE,   "\n" },
 	{ PNEWLINE,  "pnewline" },
+	{ PSHELL,   "pshell" },
 	{ LT,        "<" },
 	{ GT,        ">" },
 	{ EQ,        "=" },
@@ -168,8 +176,15 @@ uint32_t intern(const std::string& s) {
 	id_to_str[id] = s;
 	return id;
 }
+const std::string& get_str(uint32_t id) {
+	return id_to_str[id];
+}
+vector<Token> intern_all(std::vector<Word> src) {
+	intern("0eof");
+	intern("0startm");
+	intern("0endm");
 
-std::vector<uint32_t> intern_all(const std::vector<std::string>& src) {
+
 	if (str_to_id.empty()) {
 		for (uint32_t i = 0; i < ENUM_LEN; i++) {
 			str_to_id[id_table[i].text] = i;
@@ -178,17 +193,25 @@ std::vector<uint32_t> intern_all(const std::vector<std::string>& src) {
 	}
 
 
-	std::vector<uint32_t> out;
+	std::vector<Token> out;
+	
+
 	out.reserve(src.size());
 	for (int i = 0; i < (int)src.size(); i++) {
-		out.push_back(intern(src[i]));
+		out.push_back({gen_id(),intern(src[i].word)});
+
+		props::set(out.back().name, out.back().id, intern("line_in_file"), intern(src[i].line_in_file));
+		props::set(out.back().name, out.back().id, intern("file_name"), intern(src[i].file_name));
+		
 	}
+
+
 	return out;
 }
 
-const std::string& get_str(uint32_t id) {
-	return id_to_str[id];
-}
+
+
+
 
 uint32_t get_id(const std::string& s) {
 	if (s == "\n") return NEWLINE;

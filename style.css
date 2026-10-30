@@ -1,0 +1,35 @@
+body {
+    font-family: Verdana;
+    padding: 6px;
+    line-height: 1.6;
+}
+
+h1 {
+    color: #333;
+}
+
+pre, p {
+    display: inline; 
+}
+
+a {
+    color: #0366d6;
+}
+p {
+}
+pre {
+    font-family: Verdana;
+    line-height: 1.6;
+}
+
+code {
+    min-width: 200px;
+    padding: 5px;
+    width: fit-content;
+    margin: 20px;
+    display: block;
+    background: #f6f8fa;
+    border: 1px solid #ddd;
+    border-radius: 5px;
+    overflow-x: auto;
+}
